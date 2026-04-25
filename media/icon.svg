@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">Token Savior Agent icon</title>
+  <desc id="desc">Dark rounded square with a glowing ring, a TS monogram, and a checkpoint-inspired spark.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="55%" stop-color="#111827" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#22d3ee" />
+      <stop offset="100%" stop-color="#38bdf8" />
+    </linearGradient>
+    <linearGradient id="glyph" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f8fafc" />
+      <stop offset="100%" stop-color="#cbd5e1" />
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect x="16" y="16" width="224" height="224" rx="52" fill="url(#bg)" />
+  <circle cx="128" cy="128" r="78" fill="none" stroke="url(#ring)" stroke-width="16" opacity="0.9" filter="url(#glow)" />
+  <path d="M84 82h88v22h-33v76h-22v-76H84z" fill="url(#glyph)" />
+  <path d="M172 92c-10-9-23-14-37-14-31 0-56 25-56 56s25 56 56 56c18 0 34-8 45-22l-18-14c-7 9-16 14-27 14-18 0-34-15-34-34s16-34 34-34c9 0 18 4 24 10z" fill="url(#glyph)" opacity="0.95" />
+  <path d="M186 54l10 18 20 4-14 14 2 20-18-10-18 10 4-20-16-14 20-4z" fill="#22d3ee" opacity="0.95" />
+</svg>
