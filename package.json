@@ -1,7 +1,7 @@
 {
   "name": "agent-platform",
   "displayName": "Agent-Platform",
-  "description": "Backend-powered project intelligence, safe mutation workflows, checkpoints, and observability for Token Savior in VS Code.",
+  "description": "A dynamic agent platform for VS Code — generic tool providers, adaptive planning, memory abstraction, and safe mutation workflows.",
   "version": "0.1.0",
   "publisher": "samitmeem",
   "preview": true,
@@ -14,11 +14,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/samitmeem/token-savior-vscode.git"
+    "url": "https://github.com/samitmeem/Agent-Platform.git"
   },
-  "homepage": "https://github.com/samitmeem/token-savior-vscode#readme",
+  "homepage": "https://github.com/samitmeem/Agent-Platform#readme",
   "bugs": {
-    "url": "https://github.com/samitmeem/token-savior-vscode/issues"
+    "url": "https://github.com/samitmeem/Agent-Platform/issues"
   },
   "engines": {
     "vscode": "^1.99.0"
@@ -37,7 +37,7 @@
     "memory",
     "refactoring",
     "testing",
-    "token-savior"
+    "agent-platform"
   ],
   "extensionKind": [
     "workspace"
@@ -53,136 +53,136 @@
     "commands": [
       {
         "command": "tokenSaviorAgent.pingBackend",
-        "title": "Token Savior: Ping Backend",
-        "category": "Token Savior"
+        "title": "Agent-Platform: Ping Backend",
+        "category": "Agent-Platform"
       },
       {
         "command": "tokenSaviorAgent.restartBackend",
-        "title": "Token Savior: Restart Backend",
-        "category": "Token Savior"
+        "title": "Agent-Platform: Restart Backend",
+        "category": "Agent-Platform"
       },
       {
         "command": "tokenSaviorAgent.projectSummary",
-        "title": "Token Savior: Project Summary",
-        "category": "Token Savior"
+        "title": "Agent-Platform: Project Summary",
+        "category": "Agent-Platform"
       },
       {
         "command": "tokenSaviorAgent.analyzeCurrentSymbol",
-        "title": "Token Savior: Analyze Current Symbol",
-        "category": "Token Savior"
+        "title": "Agent-Platform: Analyze Current Symbol",
+        "category": "Agent-Platform"
       },
       {
         "command": "tokenSaviorAgent.findSymbol",
-        "title": "Token Savior: Find Symbol",
-        "category": "Token Savior"
+        "title": "Agent-Platform: Find Symbol",
+        "category": "Agent-Platform"
       },
       {
         "command": "tokenSaviorAgent.showDependencies",
-        "title": "Token Savior: Show Dependencies",
-        "category": "Token Savior"
+        "title": "Agent-Platform: Show Dependencies",
+        "category": "Agent-Platform"
       },
       {
         "command": "tokenSaviorAgent.showChangeImpact",
-        "title": "Token Savior: Show Change Impact",
-        "category": "Token Savior"
+        "title": "Agent-Platform: Show Change Impact",
+        "category": "Agent-Platform"
       },
       {
         "command": "tokenSaviorAgent.searchMemory",
-        "title": "Token Savior: Search Project Memory",
-        "category": "Token Savior"
+        "title": "Agent-Platform: Search Project Memory",
+        "category": "Agent-Platform"
       },
       {
         "command": "tokenSaviorAgent.reindexWorkspace",
-        "title": "Token Savior: Reindex Workspace",
-        "category": "Token Savior"
+        "title": "Agent-Platform: Reindex Workspace",
+        "category": "Agent-Platform"
       },
       {
         "command": "tokenSaviorAgent.discoverProjectActions",
-        "title": "Token Savior: Discover Project Actions",
-        "category": "Token Savior"
+        "title": "Agent-Platform: Discover Project Actions",
+        "category": "Agent-Platform"
       },
       {
         "command": "tokenSaviorAgent.runProjectAction",
-        "title": "Token Savior: Run Project Action",
-        "category": "Token Savior"
+        "title": "Agent-Platform: Run Project Action",
+        "category": "Agent-Platform"
       },
       {
         "command": "tokenSaviorAgent.runImpactedTests",
-        "title": "Token Savior: Run Impacted Tests",
-        "category": "Token Savior"
+        "title": "Agent-Platform: Run Impacted Tests",
+        "category": "Agent-Platform"
       },
       {
         "command": "tokenSaviorAgent.applySelectedTextToSymbol",
-        "title": "Token Savior: Apply Selected Text to Symbol",
-        "category": "Token Savior"
+        "title": "Agent-Platform: Apply Selected Text to Symbol",
+        "category": "Agent-Platform"
       },
       {
         "command": "tokenSaviorAgent.listCheckpoints",
-        "title": "Token Savior: List Checkpoints",
-        "category": "Token Savior"
+        "title": "Agent-Platform: List Checkpoints",
+        "category": "Agent-Platform"
       },
       {
         "command": "tokenSaviorAgent.restoreCheckpoint",
-        "title": "Token Savior: Restore Checkpoint",
-        "category": "Token Savior"
+        "title": "Agent-Platform: Restore Checkpoint",
+        "category": "Agent-Platform"
       },
       {
         "command": "tokenSaviorAgent.restoreLastCheckpoint",
-        "title": "Token Savior: Restore Last Checkpoint",
-        "category": "Token Savior"
+        "title": "Agent-Platform: Restore Last Checkpoint",
+        "category": "Agent-Platform"
       },
       {
         "command": "tokenSaviorAgent.showProviderStatus",
-        "title": "Token Savior: Show Provider Status",
-        "category": "Token Savior"
+        "title": "Agent-Platform: Show Provider Status",
+        "category": "Agent-Platform"
       },
       {
         "command": "tokenSaviorAgent.showObservabilityDashboard",
-        "title": "Token Savior: Show Observability Dashboard",
-        "category": "Token Savior"
+        "title": "Agent-Platform: Show Observability Dashboard",
+        "category": "Agent-Platform"
       },
       {
         "command": "tokenSaviorAgent.askAgentPreview",
-        "title": "Token Savior: Ask Agent (Preview)",
-        "category": "Token Savior"
+        "title": "Agent-Platform: Ask Agent (Preview)",
+        "category": "Agent-Platform"
       },
       {
         "command": "tokenSaviorAgent.askAgentAction",
-        "title": "Token Savior: Ask Agent (Action Mode)",
-        "category": "Token Savior"
+        "title": "Agent-Platform: Ask Agent (Action Mode)",
+        "category": "Agent-Platform"
       },
       {
         "command": "tokenSaviorAgent.showLastAgentTrace",
-        "title": "Token Savior: Show Last Agent Trace",
-        "category": "Token Savior"
+        "title": "Agent-Platform: Show Last Agent Trace",
+        "category": "Agent-Platform"
       },
       {
         "command": "tokenSaviorAgent.showAgentRunHistory",
-        "title": "Token Savior: Show Agent Run History",
-        "category": "Token Savior"
+        "title": "Agent-Platform: Show Agent Run History",
+        "category": "Agent-Platform"
       },
       {
         "command": "tokenSaviorAgent.clearAgentRunHistory",
-        "title": "Token Savior: Clear Agent Run History",
-        "category": "Token Savior"
+        "title": "Agent-Platform: Clear Agent Run History",
+        "category": "Agent-Platform"
       },
       {
         "command": "tokenSaviorAgent.saveLastRunToMemory",
-        "title": "Token Savior: Save Last Run to Memory",
-        "category": "Token Savior"
+        "title": "Agent-Platform: Save Last Run to Memory",
+        "category": "Agent-Platform"
       },
       {
         "command": "tokenSaviorAgent.promoteProjectMemory",
-        "title": "Token Savior: Promote Project Memory",
-        "category": "Token Savior"
+        "title": "Agent-Platform: Promote Project Memory",
+        "category": "Agent-Platform"
       }
     ],
     "chatParticipants": [
       {
         "id": "tokenSaviorAgent.assistant",
         "name": "token-savior",
-        "fullName": "Token Savior",
-        "description": "Read-only project intelligence with backend-powered code analysis and memory.",
+        "fullName": "Agent-Platform",
+        "description": "Dynamic agent platform — generic tool providers, adaptive planning, memory abstraction, and safe code mutations.",
         "isSticky": true,
         "commands": [
           {
@@ -212,7 +212,7 @@
       "explorer": [
         {
           "id": "tokenSaviorAgent.runHistory",
-          "name": "Token Savior Agent Runs"
+          "name": "Agent-Platform Runs"
         }
       ]
     },
@@ -236,17 +236,17 @@
       ]
     },
     "configuration": {
-      "title": "Token Savior Agent",
+      "title": "Agent-Platform",
       "properties": {
         "tokenSaviorAgent.pythonPath": {
           "type": "string",
           "default": "",
-          "description": "Optional absolute path to the Python executable used to launch the Token Savior backend."
+          "description": "Optional absolute path to the Python executable used to launch the Agent-Platform backend."
         },
         "tokenSaviorAgent.backend.enabled": {
           "type": "boolean",
           "default": true,
-          "description": "Enable the Token Savior Python backend tool provider. Set to false to run the agent without any tool provider (direct-answer mode only)."
+          "description": "Enable the Agent-Platform Python backend tool provider. Set to false to run the agent without any tool provider (direct-answer mode only)."
         },
         "tokenSaviorAgent.serviceModule": {
           "type": "string",
