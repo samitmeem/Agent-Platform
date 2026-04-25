@@ -1,4 +1,4 @@
-import { formatToolResult, type ServiceToolResult } from "../backend/protocol";
+import { formatToolResult, type ToolResult } from "../tools/interface";
 import type { StoredPreviewRun } from "../state/sessionStore";
 
 export interface MemorySavePayload extends Record<string, unknown> {
@@ -35,7 +35,7 @@ function getToolSequence(run: StoredPreviewRun): string[] {
   return run.result.plan.kind === "tool" ? [run.result.plan.toolName] : [];
 }
 
-function getToolResults(run: StoredPreviewRun): ServiceToolResult[] {
+function getToolResults(run: StoredPreviewRun): ToolResult[] {
   if (run.result.toolResults && run.result.toolResults.length > 0) {
     return [...run.result.toolResults];
   }
@@ -134,7 +134,7 @@ export function buildMemoryPayloadFromRun(run: StoredPreviewRun): MemorySavePayl
   };
 }
 
-export function buildMemoryPayloadFromToolResult(title: string, result: ServiceToolResult): MemorySavePayload {
+export function buildMemoryPayloadFromToolResult(title: string, result: ToolResult): MemorySavePayload {
   return {
     type: result.ok ? "note" : "warning",
     title: compact(title, 100),

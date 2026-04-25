@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 
-import type { ServiceHealth } from "../backend/protocol";
+import type { ServiceHealth } from "../adapters/tokenSavior/protocol";
 import {
   getStatusBarText,
   getStatusBarTooltip,

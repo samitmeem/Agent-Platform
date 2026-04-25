@@ -27,6 +27,7 @@ test("AgentMemoryBridge builds bounded recent-run and memory context", async () 
   const bridge = new AgentMemoryBridge({
     workspaceRoot: "C:/repo",
     sessionStore: store,
+    memoryCapability: { searchToolName: "memory_search", sessionHistoryToolName: "memory_session_history", saveToolName: "memory_save" },
     toolExecutor: {
       invokeTool: async (_root, name) => {
         if (name === "memory_session_history") {
@@ -60,6 +61,7 @@ test("AgentMemoryBridge skips project memory search for very short queries", asy
   const bridge = new AgentMemoryBridge({
     workspaceRoot: "C:/repo",
     sessionStore: store,
+    memoryCapability: { searchToolName: "memory_search", sessionHistoryToolName: "memory_session_history", saveToolName: "memory_save" },
     toolExecutor: {
       invokeTool: async (_root, name) => {
         calledTools.push(name);

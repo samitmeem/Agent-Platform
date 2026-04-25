@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 
-import type { ServiceToolResult } from "../backend/protocol";
+import type { ToolResult } from "../tools/interface";
 
 export interface CommandUi {
   showInformationMessage(message: string): Thenable<string | undefined>;
@@ -23,19 +23,18 @@ export interface ToolInvocationRecord {
   argumentsPayload: Record<string, unknown>;
 }
 
-type MockToolResponseInput = ServiceToolResult | ServiceToolResult[];
+type MockToolResponseInput = ToolResult | ToolResult[];
 
 function normalizeResponse(
   workspaceRoot: string,
   toolName: string,
-  response: ServiceToolResult,
-): ServiceToolResult {
+  response: ToolResult,
+): ToolResult {
   return {
     name: response.name || toolName,
     ok: response.ok,
     content: response.content,
     error: response.error ?? null,
-    active_project: response.active_project ?? workspaceRoot,
   };
 }
 
@@ -47,7 +46,7 @@ export class ExtensionTestHarness implements CommandUi {
   private readonly inputBoxResponses: string[] = [];
   private readonly quickPickResponses: string[] = [];
   private readonly warningMessageResponses: string[] = [];
-  private readonly toolResponses = new Map<string, ServiceToolResult[]>();
+  private readonly toolResponses = new Map<string, ToolResult[]>();
   private readonly toolInvocations: ToolInvocationRecord[] = [];
   private readonly informationMessages: string[] = [];
   private readonly warningMessages: string[] = [];
@@ -105,11 +104,11 @@ export class ExtensionTestHarness implements CommandUi {
   }
 
   public async invokeTool(
-    fallback: (workspaceRoot: string, name: string, argumentsPayload?: Record<string, unknown>) => Promise<ServiceToolResult>,
+    fallback: (workspaceRoot: string, name: string, argumentsPayload?: Record<string, unknown>) => Promise<ToolResult>,
     workspaceRoot: string,
     toolName: string,
     argumentsPayload: Record<string, unknown> = {},
-  ): Promise<ServiceToolResult> {
+  ): Promise<ToolResult> {
     this.toolInvocations.push({ workspaceRoot, toolName, argumentsPayload });
     const queued = this.toolResponses.get(toolName);
     if (queued && queued.length > 0) {

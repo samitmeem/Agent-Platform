@@ -7,7 +7,8 @@ import {
   deriveRunFailureMessage,
   deriveRunOutcome,
 } from "../agent/runtime";
-import { BackendGateway } from "../backend/gateway";
+import type { ToolProviderRegistry } from "../tools/providerRegistry";
+import type { MemoryCapability } from "../tools/interface";
 import type { ApprovalSettings } from "../policies/approvalPolicy";
 import { ModelProviderRegistry } from "../providers/registry";
 import { SessionStore } from "../state/sessionStore";
@@ -21,7 +22,11 @@ import {
 } from "./presentation";
 
 export interface ChatParticipantEnvironment {
-  gateway: BackendGateway;
+  toolProviderRegistry: ToolProviderRegistry;
+  /** Optional direct gateway reference — used only for health reads from the token-savior adapter. */
+  gateway?: import("../adapters/tokenSavior/gateway").BackendGateway;
+  /** Memory capability resolved from the active tool provider — passed to AgentRuntime. */
+  memoryCapability?: MemoryCapability;
   statusBar: BackendStatusBarController;
   outputChannel: vscode.OutputChannel;
   getWorkspaceRoot(): string | undefined;
@@ -82,8 +87,10 @@ export function registerChatParticipant(
         workspaceRoot,
         providerRegistry: env.getProviderRegistry(),
         sessionStore: env.getSessionStore(),
+        listTools: () => env.toolProviderRegistry.listAllTools(),
+        memoryCapability: env.memoryCapability,
         toolExecutor: {
-          invokeTool: (root, name, argumentsPayload) => env.gateway.invokeTool(root, name, argumentsPayload),
+          invokeTool: (root, name, argumentsPayload) => env.toolProviderRegistry.routeTool(name, argumentsPayload, root),
         },
       });
       const result = await runtime.runPreview({
@@ -95,7 +102,7 @@ export function registerChatParticipant(
       const outcome = deriveRunOutcome(result);
 
       const recorded = await recordPreviewRun({
-        gateway: env.gateway,
+        toolProviderRegistry: env.toolProviderRegistry,
         sessionStore: env.getSessionStore(),
         workspaceRoot,
         getApprovalSettings: env.getApprovalSettings,
@@ -134,7 +141,7 @@ export function registerChatParticipant(
         return;
       }
 
-      env.statusBar.setReady(env.gateway.getLastHealth(), "Token Savior chat complete.");
+      env.statusBar.setReady(env.gateway?.getLastHealth(), "Token Savior chat complete.");
     } catch (error) {
       if (error instanceof AgentRuntimeCancelledError) {
         await env.getTelemetryState().recordRunEvent({

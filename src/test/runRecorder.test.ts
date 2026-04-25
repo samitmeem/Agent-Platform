@@ -100,8 +100,8 @@ function createFailedResult(): AgentPreviewResult {
 test("recordPreviewRun stores runs even when auto-save is disabled", async () => {
   const store = new SessionStore();
   const result = await recordPreviewRun({
-    gateway: {
-      invokeTool: async () => {
+    toolProviderRegistry: {
+      routeTool: async () => {
         throw new Error("memory_save should not be called");
       },
     } as never,
@@ -126,11 +126,12 @@ test("recordPreviewRun auto-saves eligible runs to project memory", async () => 
   const calls: Array<{ toolName: string; args: Record<string, unknown> }> = [];
 
   const result = await recordPreviewRun({
-    gateway: {
-      invokeTool: async (_workspaceRoot: string, toolName: string, args: Record<string, unknown>) => {
+    toolProviderRegistry: {
+      routeTool: async (_workspaceRoot: string, toolName: string, args: Record<string, unknown>) => {
         calls.push({ toolName, args });
         return { name: toolName, ok: true, content: ["saved"] };
       },
+      resolveMemoryCapability: () => ({ searchToolName: "memory_search", sessionHistoryToolName: "memory_session_history", saveToolName: "memory_save" }),
     } as never,
     sessionStore: store,
     workspaceRoot: "C:/repo",
@@ -154,10 +155,11 @@ test("recordPreviewRun records auto-save failures without dropping the run", asy
   const store = new SessionStore();
 
   const result = await recordPreviewRun({
-    gateway: {
-      invokeTool: async () => {
+    toolProviderRegistry: {
+      routeTool: async () => {
         throw new Error("database unavailable");
       },
+      resolveMemoryCapability: () => ({ searchToolName: "memory_search", sessionHistoryToolName: "memory_session_history", saveToolName: "memory_save" }),
     } as never,
     sessionStore: store,
     workspaceRoot: "C:/repo",

@@ -1,6 +1,6 @@
 import { isAbsolute, relative } from "node:path";
 
-import type { BackendGateway } from "../backend/gateway";
+import type { ToolProviderRegistry } from "../tools/providerRegistry";
 import {
   buildMemoryPayloadFromRun,
   evaluatePreviewRunForAutoSave,
@@ -29,7 +29,7 @@ export interface RecordPreviewRunInput {
 }
 
 export interface RecordPreviewRunDependencies {
-  gateway: BackendGateway;
+  toolProviderRegistry: ToolProviderRegistry;
   sessionStore: SessionStore;
   workspaceRoot: string;
   getApprovalSettings(): ApprovalSettings;
@@ -85,11 +85,21 @@ export async function recordPreviewRun(
     return { run, memoryStatus: run.memoryStatus };
   }
 
+  const memoryCapability = dependencies.toolProviderRegistry.resolveMemoryCapability();
+  if (!memoryCapability) {
+    run.memoryStatus = {
+      state: "skipped",
+      reason: "No memory capability registered — auto-save requires a provider that declares a saveToolName.",
+    };
+    dependencies.sessionStore.savePreviewRun(run);
+    return { run, memoryStatus: run.memoryStatus };
+  }
+
   try {
-    await dependencies.gateway.invokeTool(
-      dependencies.workspaceRoot,
-      "memory_save",
+    await dependencies.toolProviderRegistry.routeTool(
+      memoryCapability.saveToolName,
       buildMemoryPayloadFromRun(run),
+      dependencies.workspaceRoot,
     );
     run.memoryStatus = {
       state: "saved",

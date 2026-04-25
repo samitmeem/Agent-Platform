@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import { recordPreviewRun } from "../agent/runRecorder";
 import { AgentRuntime } from "../agent/runtime";
-import type { ServiceToolResult } from "../backend/protocol";
+import type { ToolResult } from "../tools/interface";
 import type {
   ModelProvider,
   ProviderAvailability,
@@ -76,7 +76,7 @@ test("preview lifecycle preserves the golden trace and telemetry snapshot", asyn
   const registry = new ModelProviderRegistry([provider], "copilot");
   const sessionStore = new SessionStore();
   const telemetryState = new TelemetryState(new FakeMemento() as never);
-  const toolResult: ServiceToolResult = {
+  const toolResult: ToolResult = {
     name: "get_project_summary",
     ok: true,
     content: ["Python backend + VS Code extension"],
@@ -98,8 +98,8 @@ test("preview lifecycle preserves the golden trace and telemetry snapshot", asyn
     maxToolSteps: 1,
   });
   const recorded = await recordPreviewRun({
-    gateway: {
-      invokeTool: async () => {
+    toolProviderRegistry: {
+      routeTool: async () => {
         throw new Error("memory_save should not be called when auto-save is disabled");
       },
     } as never,
@@ -157,8 +157,8 @@ test("action lifecycle preserves the bounded-action golden trace and telemetry s
     maxToolSteps: 2,
   });
   const recorded = await recordPreviewRun({
-    gateway: {
-      invokeTool: async () => {
+    toolProviderRegistry: {
+      routeTool: async () => {
         throw new Error("memory_save should not be called when auto-save is disabled");
       },
     } as never,

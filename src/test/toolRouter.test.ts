@@ -2,7 +2,15 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { ToolApprovalDeniedError, ToolRouter } from "../agent/toolRouter";
-import type { ServiceToolResult } from "../backend/protocol";
+import type { ToolResult } from "../tools/interface";
+import { ToolPolicyRegistry, globalToolPolicyRegistry } from "../policies/toolPolicy";
+import type { ToolProviderRegistry } from "../tools/providerRegistry";
+
+function mockRegistry(fn: (name: string) => ToolResult): ToolProviderRegistry {
+  return {
+    routeTool: async (name: string, _args: Record<string, unknown>, _root: string): Promise<ToolResult> => fn(name),
+  } as unknown as ToolProviderRegistry;
+}
 
 const approvalSettings = {
   editMode: "ask" as const,
@@ -16,12 +24,8 @@ const approvalSettings = {
 test("ToolRouter runs read tools without approval", async () => {
   const calls: string[] = [];
   const router = new ToolRouter({
-    gateway: {
-      invokeTool: async (_root: string, toolName: string): Promise<ServiceToolResult> => {
-        calls.push(toolName);
-        return { name: toolName, ok: true, content: ["ok"] };
-      },
-    } as never,
+    toolProviderRegistry: mockRegistry((toolName) => { calls.push(toolName); return { name: toolName, ok: true, content: ["ok"] }; }),
+    policyRegistry: globalToolPolicyRegistry,
     workspaceRoot: "C:/repo",
     getApprovalSettings: () => approvalSettings,
     isWorkspaceTrusted: () => false,
@@ -35,9 +39,8 @@ test("ToolRouter runs read tools without approval", async () => {
 
 test("ToolRouter rejects edit tools when approval is denied", async () => {
   const router = new ToolRouter({
-    gateway: {
-      invokeTool: async (): Promise<ServiceToolResult> => ({ name: "apply_symbol_change_and_validate", ok: true, content: ["ok"] }),
-    } as never,
+    toolProviderRegistry: mockRegistry((name) => ({ name, ok: true, content: ["ok"] })),
+    policyRegistry: globalToolPolicyRegistry,
     workspaceRoot: "C:/repo",
     getApprovalSettings: () => approvalSettings,
     isWorkspaceTrusted: () => false,
@@ -53,9 +56,8 @@ test("ToolRouter rejects edit tools when approval is denied", async () => {
 test("ToolRouter auto-allows trusted command tools and calls completion hook", async () => {
   const completed: string[] = [];
   const router = new ToolRouter({
-    gateway: {
-      invokeTool: async (_root: string, toolName: string): Promise<ServiceToolResult> => ({ name: toolName, ok: true, content: ["done"] }),
-    } as never,
+    toolProviderRegistry: mockRegistry((name) => ({ name, ok: true, content: ["done"] })),
+    policyRegistry: globalToolPolicyRegistry,
     workspaceRoot: "C:/repo",
     getApprovalSettings: () => approvalSettings,
     isWorkspaceTrusted: () => true,

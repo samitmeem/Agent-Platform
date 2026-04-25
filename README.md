@@ -1,6 +1,6 @@
 # Token Savior Agent — VS Code Extension
 
-A VS Code extension that connects to the [token-savior](https://github.com/Mibayy/token-savior)
+A VS Code extension that connects to the MCPs
 Python backend to provide project-wide code intelligence, safe mutation workflows,
 checkpoints, memory, and observability.
 

@@ -1,4 +1,4 @@
-import { formatToolResult } from "../backend/protocol";
+import { formatToolResult } from "../tools/interface";
 import { formatTraceEntries } from "../agent/trace";
 
 import type { StoredPreviewRun } from "./sessionStore";

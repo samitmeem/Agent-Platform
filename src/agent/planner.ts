@@ -1,5 +1,5 @@
 import type { ModelProvider } from "../providers/base";
-import { formatToolResult, type ServiceToolResult } from "../backend/protocol";
+import { formatToolResult, type ToolResult } from "../tools/interface";
 
 import type { AgentPlan, AgentRuntimeMode, AgentToolName } from "./types";
 
@@ -10,11 +10,15 @@ export interface AgentPlannerInput {
   mode?: AgentRuntimeMode;
   provider?: ModelProvider;
   context?: string;
+  /** Pre-built tool manifest from ToolRegistry.buildToolManifestForPrompt() for the LLM prompt. */
+  toolManifest?: string;
+  /** Set of currently registered tool names. undefined = accept any (compat mode). Empty set = no tools. */
+  knownToolNames?: ReadonlySet<string>;
 }
 
 export interface AgentPlannerFollowUpInput extends AgentPlannerInput {
   previousPlans: AgentPlan[];
-  previousToolResults: ServiceToolResult[];
+  previousToolResults: ToolResult[];
 }
 
 type ModelPlanPayload = {
@@ -83,18 +87,24 @@ function extractLikelySymbolName(query: string, selectedText?: string): string |
   return undefined;
 }
 
+/**
+ * Converts a raw model JSON payload into an AgentPlan.
+ *
+ * Fully generic: validates the tool name against the live registry (when provided)
+ * and passes arguments through without per-tool shaping. The model is responsible
+ * for providing complete arguments since it receives the full tool manifest in the
+ * system prompt. Minimal enrichment only: fill "name" and "query" when omitted.
+ */
 function normalizeToolPlan(
   payload: ModelPlanPayload,
+  knownTools: ReadonlySet<string> | undefined,
   fallbackQuery: string,
   selectedText?: string,
-  activeFilePath?: string,
-  mode: AgentRuntimeMode = "preview",
 ): AgentPlan | undefined {
   if (payload.mode === "direct") {
     if (!payload.response || payload.response.trim().length === 0) {
       return undefined;
     }
-
     return {
       kind: "direct",
       response: payload.response.trim(),
@@ -107,194 +117,31 @@ function normalizeToolPlan(
     return undefined;
   }
 
-  if (payload.toolName === "get_project_summary") {
-    return {
-      kind: "tool",
-      toolName: "get_project_summary",
-      arguments: {},
-      reasoning: payload.reasoning?.trim() || "A project summary should answer the request.",
-      source: "model",
-    };
+  // Reject tool names not registered in the current provider registry.
+  // undefined knownTools = compat mode (no registry injected) — accept any name.
+  if (knownTools !== undefined && knownTools.size > 0 && !knownTools.has(payload.toolName)) {
+    return undefined;
   }
 
-  if (payload.toolName === "memory_search") {
-    const query = typeof payload.arguments?.query === "string" && payload.arguments.query.trim().length > 0
-      ? payload.arguments.query.trim()
-      : fallbackQuery;
-    const limit = typeof payload.arguments?.limit === "number" ? payload.arguments.limit : 10;
-    return {
-      kind: "tool",
-      toolName: "memory_search",
-      arguments: { query, limit },
-      reasoning: payload.reasoning?.trim() || "Searching project memory should answer the request.",
-      source: "model",
-    };
+  const args: Record<string, unknown> = { ...(payload.arguments ?? {}) };
+
+  // Minimal enrichment: fill "name" from context when the model omitted it
+  if (!args["name"]) {
+    const symbolName = extractLikelySymbolName(fallbackQuery, selectedText);
+    if (symbolName) { args["name"] = symbolName; }
+  }
+  // Fill "query" when omitted (useful for memory-style tools)
+  if (!args["query"]) {
+    args["query"] = fallbackQuery.trim();
   }
 
-  if (payload.toolName === "find_symbol") {
-    const name = typeof payload.arguments?.name === "string" && payload.arguments.name.trim().length > 0
-      ? payload.arguments.name.trim()
-      : extractLikelySymbolName(fallbackQuery, selectedText);
-    if (!name) {
-      return undefined;
-    }
-
-    return {
-      kind: "tool",
-      toolName: "find_symbol",
-      arguments: {
-        name,
-        level: 1,
-        hints: true,
-        compress: false,
-      },
-      reasoning: payload.reasoning?.trim() || "Locating the symbol should answer the request.",
-      source: "model",
-    };
-  }
-
-  if (payload.toolName === "get_dependencies") {
-    const name = typeof payload.arguments?.name === "string" && payload.arguments.name.trim().length > 0
-      ? payload.arguments.name.trim()
-      : extractLikelySymbolName(fallbackQuery, selectedText);
-    if (!name) {
-      return undefined;
-    }
-
-    return {
-      kind: "tool",
-      toolName: "get_dependencies",
-      arguments: {
-        name,
-        max_results: 20,
-        compress: false,
-      },
-      reasoning: payload.reasoning?.trim() || "Inspecting symbol dependencies should answer the request.",
-      source: "model",
-    };
-  }
-
-  if (payload.toolName === "get_change_impact") {
-    const name = typeof payload.arguments?.name === "string" && payload.arguments.name.trim().length > 0
-      ? payload.arguments.name.trim()
-      : extractLikelySymbolName(fallbackQuery, selectedText);
-    if (!name) {
-      return undefined;
-    }
-
-    return {
-      kind: "tool",
-      toolName: "get_change_impact",
-      arguments: {
-        name,
-        max_direct: 20,
-        max_transitive: 50,
-      },
-      reasoning: payload.reasoning?.trim() || "Change-impact analysis should answer the request.",
-      source: "model",
-    };
-  }
-
-  if (payload.toolName === "get_full_context") {
-    const name = typeof payload.arguments?.name === "string" && payload.arguments.name.trim().length > 0
-      ? payload.arguments.name.trim()
-      : extractLikelySymbolName(fallbackQuery, selectedText);
-    if (!name) {
-      return undefined;
-    }
-
-    return {
-      kind: "tool",
-      toolName: "get_full_context",
-      arguments: {
-        name,
-        depth: 2,
-        mode: "compact",
-        max_lines: 200,
-      },
-      reasoning: payload.reasoning?.trim() || "A full symbol context bundle should answer the request.",
-      source: "model",
-    };
-  }
-
-  if (mode === "action" && payload.toolName === "discover_project_actions") {
-    return {
-      kind: "tool",
-      toolName: "discover_project_actions",
-      arguments: {},
-      reasoning: payload.reasoning?.trim() || "Discovering project actions is the safest first step for action-mode execution.",
-      source: "model",
-    };
-  }
-
-  if (mode === "action" && payload.toolName === "run_project_action") {
-    const actionId = typeof payload.arguments?.action_id === "string" && payload.arguments.action_id.trim().length > 0
-      ? payload.arguments.action_id.trim()
-      : extractLikelyProjectActionId(fallbackQuery);
-    if (!actionId) {
-      return undefined;
-    }
-
-    return {
-      kind: "tool",
-      toolName: "run_project_action",
-      arguments: {
-        action_id: actionId,
-        include_output: true,
-      },
-      reasoning: payload.reasoning?.trim() || "Running the selected project action best satisfies the request.",
-      source: "model",
-    };
-  }
-
-  if (mode === "action" && payload.toolName === "run_impacted_tests") {
-    const symbolNames = Array.isArray(payload.arguments?.symbol_names)
-      ? payload.arguments.symbol_names
-      : undefined;
-    const name = typeof symbolNames?.[0] === "string"
-      ? String(symbolNames[0]).trim()
-      : extractLikelySymbolName(fallbackQuery, selectedText);
-    return {
-      kind: "tool",
-      toolName: "run_impacted_tests",
-      arguments: {
-        ...(name ? { symbol_names: [name] } : activeFilePath ? { changed_files: [activeFilePath] } : {}),
-        include_output: true,
-        compact: false,
-      },
-      reasoning: payload.reasoning?.trim() || "Running impacted tests is the safest bounded way to validate the requested change.",
-      source: "model",
-    };
-  }
-
-  if (mode === "action" && payload.toolName === "apply_symbol_change_and_validate") {
-    const symbolName = typeof payload.arguments?.symbol_name === "string" && payload.arguments.symbol_name.trim().length > 0
-      ? payload.arguments.symbol_name.trim()
-      : extractLikelySymbolName(fallbackQuery);
-    const newSource = typeof payload.arguments?.new_source === "string" && payload.arguments.new_source.trim().length > 0
-      ? payload.arguments.new_source
-      : selectedText?.trim();
-    if (!symbolName || !newSource) {
-      return undefined;
-    }
-
-    return {
-      kind: "tool",
-      toolName: "apply_symbol_change_and_validate",
-      arguments: {
-        symbol_name: symbolName,
-        new_source: newSource,
-        ...(activeFilePath ? { file_path: activeFilePath } : {}),
-        rollback_on_failure: true,
-        include_output: true,
-        compact: false,
-      },
-      reasoning: payload.reasoning?.trim() || "Applying the provided symbol change with validation best satisfies the request.",
-      source: "model",
-    };
-  }
-
-  return undefined;
+  return {
+    kind: "tool",
+    toolName: payload.toolName,
+    arguments: args,
+    reasoning: payload.reasoning?.trim() || `Invoking ${payload.toolName} to answer the request.`,
+    source: "model",
+  };
 }
 
 export function extractFirstJsonObject(text: string): string | undefined {
@@ -318,6 +165,28 @@ export function extractFirstJsonObject(text: string): string | undefined {
 }
 
 export function createHeuristicPlan(
+  query: string,
+  selectedText?: string,
+  mode: AgentRuntimeMode = "preview",
+  activeFilePath?: string,
+  knownTools?: ReadonlySet<string>,
+): AgentPlan {
+  const plan = computeHeuristicPlan(query, selectedText, mode, activeFilePath);
+  // Registry guard: if the chosen tool is not registered, fall back to a direct response.
+  if (plan.kind === "tool" && knownTools !== undefined && !knownTools.has(plan.toolName)) {
+    return {
+      kind: "direct",
+      response: knownTools.size === 0
+        ? "No tool providers are currently registered. I can answer questions based on context only."
+        : "The most relevant tool for this request is not currently available. I can answer based on context.",
+      reasoning: `Planned tool (${plan.toolName}) is not registered in any active provider.`,
+      source: "heuristic",
+    };
+  }
+  return plan;
+}
+
+function computeHeuristicPlan(
   query: string,
   selectedText?: string,
   mode: AgentRuntimeMode = "preview",
@@ -551,10 +420,13 @@ export function createHeuristicPlan(
 export class AgentPlanner {
   public async plan(input: AgentPlannerInput): Promise<AgentPlan> {
     const mode = input.mode ?? "preview";
-    const fallbackPlan = createHeuristicPlan(input.query, input.selectedText, mode, input.activeFilePath);
+    const knownTools = input.knownToolNames;
+    const fallbackPlan = createHeuristicPlan(input.query, input.selectedText, mode, input.activeFilePath, knownTools);
     if (!input.provider) {
       return fallbackPlan;
     }
+
+    const toolManifest = input.toolManifest ?? "(no tools available — always return a direct response)";
 
     try {
       const response = await input.provider.complete({
@@ -562,31 +434,24 @@ export class AgentPlanner {
           {
             role: "system",
             content: [
-              "You are a planner for a read-only VS Code coding agent.",
+              "You are a planner for a VS Code coding agent.",
               "You must choose exactly one of these outcomes:",
               "1. direct response",
-              "2. tool call to get_project_summary",
-              "3. tool call to find_symbol",
-              "4. tool call to memory_search",
-              "5. tool call to get_dependencies",
-              "6. tool call to get_change_impact",
-              "7. tool call to get_full_context",
-              ...(mode === "action"
-                ? [
-                  "8. tool call to discover_project_actions",
-                  "9. tool call to run_project_action",
-                  "10. tool call to run_impacted_tests",
-                  "11. tool call to apply_symbol_change_and_validate",
-                ]
-                : []),
+              "2. a tool call from the available tools list",
+              "",
+              "Available tools:",
+              toolManifest,
+              "",
               "Return strict JSON only with no prose.",
               "For a direct response, return:",
               '{"mode":"direct","response":"...","reasoning":"..."}',
               "For a tool response, return:",
-              '{"mode":"tool","toolName":"find_symbol","arguments":{"name":"..."},"reasoning":"..."}',
-              mode === "action"
-                ? "In action mode, only choose mutating tools when the user clearly asked for an action."
-                : "Never choose tools outside the allowed set.",
+              '{"mode":"tool","toolName":"<name>","arguments":{...},"reasoning":"..."}',
+              knownTools !== undefined && knownTools.size === 0
+                ? "No tools are available. You MUST return a direct response."
+                : mode === "action"
+                  ? "In action mode, mutating tools are allowed only when the user explicitly asked for an action."
+                  : "Prefer read-only and memory tools. Avoid mutating tools unless explicitly asked.",
             ].join("\n"),
           },
           {
@@ -600,7 +465,7 @@ export class AgentPlanner {
             ].join("\n"),
           },
         ],
-        justification: "Plan the next safe read-only action for the Token Savior preview agent.",
+        justification: "Plan the next safe action for the agent.",
       });
 
       const json = extractFirstJsonObject(response.text);
@@ -609,7 +474,7 @@ export class AgentPlanner {
       }
 
       const parsed = JSON.parse(json) as ModelPlanPayload;
-      return normalizeToolPlan(parsed, input.query, input.selectedText, input.activeFilePath, mode) ?? fallbackPlan;
+      return normalizeToolPlan(parsed, knownTools, input.query, input.selectedText) ?? fallbackPlan;
     } catch {
       return fallbackPlan;
     }
@@ -617,6 +482,7 @@ export class AgentPlanner {
 
   public async planFollowUp(input: AgentPlannerFollowUpInput): Promise<AgentPlan | undefined> {
     const mode = input.mode ?? "preview";
+    const knownTools = input.knownToolNames;
     const heuristic = createHeuristicFollowUpPlan(
       input.query,
       input.previousPlans,
@@ -624,10 +490,13 @@ export class AgentPlanner {
       input.selectedText,
       mode,
       input.activeFilePath,
+      knownTools,
     );
     if (!input.provider) {
       return heuristic;
     }
+
+    const toolManifest = input.toolManifest ?? "(no tools available — always return a direct response)";
 
     try {
       const response = await input.provider.complete({
@@ -635,21 +504,24 @@ export class AgentPlanner {
           {
             role: "system",
             content: [
-              "You are a follow-up planner for a read-only VS Code coding agent.",
+              "You are a follow-up planner for a VS Code coding agent.",
               "You have already seen tool outputs from earlier steps.",
-              "Decide whether the agent should stop with a direct answer or invoke exactly one more safe read-only tool.",
-              "Allowed tools: get_project_summary, find_symbol, memory_search, get_dependencies, get_change_impact, get_full_context.",
-              ...(mode === "action"
-                ? [
-                  "Action-mode tools also allowed when clearly requested: discover_project_actions, run_project_action, run_impacted_tests, apply_symbol_change_and_validate.",
-                ]
-                : []),
+              "Decide whether the agent should stop with a direct answer or invoke exactly one more tool.",
+              "",
+              "Available tools:",
+              toolManifest,
+              "",
               "Avoid repeating the same tool unless the previous result clearly failed.",
               "Return strict JSON only with no prose.",
               "Direct answer format:",
               '{"mode":"direct","response":"...","reasoning":"..."}',
               "Tool answer format:",
-              '{"mode":"tool","toolName":"get_dependencies","arguments":{"name":"..."},"reasoning":"..."}',
+              '{"mode":"tool","toolName":"<name>","arguments":{...},"reasoning":"..."}',
+              knownTools !== undefined && knownTools.size === 0
+                ? "No tools are available. You MUST return a direct response."
+                : mode === "action"
+                  ? "Action-mode mutating tools are allowed when clearly requested."
+                  : "Prefer read-only and memory tools only.",
             ].join("\n"),
           },
           {
@@ -676,7 +548,7 @@ export class AgentPlanner {
             ].join("\n\n"),
           },
         ],
-        justification: "Decide the next bounded safe read-only step for the Token Savior agent.",
+        justification: "Decide the next bounded safe step for the agent.",
       });
 
       const json = extractFirstJsonObject(response.text);
@@ -685,7 +557,7 @@ export class AgentPlanner {
       }
 
       const parsed = JSON.parse(json) as ModelPlanPayload;
-      return normalizeToolPlan(parsed, input.query, input.selectedText, input.activeFilePath, mode) ?? heuristic;
+      return normalizeToolPlan(parsed, knownTools, input.query, input.selectedText) ?? heuristic;
     } catch {
       return heuristic;
     }
@@ -695,7 +567,24 @@ export class AgentPlanner {
 function createHeuristicFollowUpPlan(
   query: string,
   previousPlans: AgentPlan[],
-  previousToolResults: ServiceToolResult[],
+  previousToolResults: ToolResult[],
+  selectedText?: string,
+  mode: AgentRuntimeMode = "preview",
+  activeFilePath?: string,
+  knownTools?: ReadonlySet<string>,
+): AgentPlan | undefined {
+  const plan = computeHeuristicFollowUpPlan(query, previousPlans, previousToolResults, selectedText, mode, activeFilePath);
+  // Registry guard: skip follow-up tool steps for tools that are not registered.
+  if (plan && plan.kind === "tool" && knownTools !== undefined && !knownTools.has(plan.toolName)) {
+    return undefined;
+  }
+  return plan;
+}
+
+function computeHeuristicFollowUpPlan(
+  query: string,
+  previousPlans: AgentPlan[],
+  previousToolResults: ToolResult[],
   selectedText?: string,
   mode: AgentRuntimeMode = "preview",
   activeFilePath?: string,

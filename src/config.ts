@@ -1,6 +1,5 @@
 import * as vscode from "vscode";
 
-import type { BackendLaunchConfig } from "./backend/processManager";
 import type { ApprovalSettings, ApprovalMode } from "./policies/approvalPolicy";
 import type { ProviderKind } from "./providers/base";
 
@@ -24,15 +23,6 @@ function normalizeApprovalMode(value: string | undefined, fallback: ApprovalMode
 
 export function getPrimaryWorkspaceRoot(): string | undefined {
   return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-}
-
-export function loadBackendLaunchConfig(workspaceRoot: string): BackendLaunchConfig {
-  const config = vscode.workspace.getConfiguration("tokenSaviorAgent");
-  return {
-    workspaceRoot,
-    configuredPythonPath: config.get<string>("pythonPath") ?? undefined,
-    serviceModule: config.get<string>("serviceModule") ?? undefined,
-  };
 }
 
 export function loadModelProviderSettings(): ModelProviderSettings {

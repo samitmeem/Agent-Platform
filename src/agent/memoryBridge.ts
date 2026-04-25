@@ -1,4 +1,4 @@
-import { formatToolResult, type ServiceToolResult } from "../backend/protocol";
+import { formatToolResult, type MemoryCapability, type ToolResult } from "../tools/interface";
 import type { SessionStore } from "../state/sessionStore";
 
 export interface AgentMemoryToolExecutor {
@@ -6,13 +6,15 @@ export interface AgentMemoryToolExecutor {
     workspaceRoot: string,
     name: string,
     argumentsPayload: Record<string, unknown>,
-  ): Promise<ServiceToolResult>;
+  ): Promise<ToolResult>;
 }
 
 export interface AgentMemoryBridgeDependencies {
   workspaceRoot: string;
   toolExecutor: AgentMemoryToolExecutor;
   sessionStore: SessionStore;
+  /** Provided by the registered tool provider; omit to disable memory tool calls. */
+  memoryCapability?: MemoryCapability;
 }
 
 export interface AgentMemoryContext {
@@ -49,9 +51,12 @@ export class AgentMemoryBridge {
       .listPreviewRuns(3)
       .map((run) => `${toCompactSingleLine(run.query, 90)} => ${toCompactSingleLine(run.answer, 120)}`);
 
-    const sessionHistoryResult = await this.tryInvokeTool("memory_session_history", { limit: 2 });
-    const projectMemoryResult = shouldSearchProjectMemory(query)
-      ? await this.tryInvokeTool("memory_search", { query, limit: 3 })
+    const capability = this.dependencies.memoryCapability;
+    const sessionHistoryResult = capability
+      ? await this.tryInvokeTool(capability.sessionHistoryToolName, { limit: 2 })
+      : undefined;
+    const projectMemoryResult = (capability && shouldSearchProjectMemory(query))
+      ? await this.tryInvokeTool(capability.searchToolName, { query, limit: 3 })
       : undefined;
 
     return {
@@ -64,7 +69,7 @@ export class AgentMemoryBridge {
   private async tryInvokeTool(
     name: string,
     argumentsPayload: Record<string, unknown>,
-  ): Promise<ServiceToolResult | undefined> {
+  ): Promise<ToolResult | undefined> {
     try {
       return await this.dependencies.toolExecutor.invokeTool(
         this.dependencies.workspaceRoot,
@@ -77,7 +82,7 @@ export class AgentMemoryBridge {
   }
 
   private extractContextText(
-    result: ServiceToolResult | undefined,
+    result: ToolResult | undefined,
     maxLength: number,
   ): string | undefined {
     if (!result?.ok) {

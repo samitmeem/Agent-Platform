@@ -1,4 +1,4 @@
-import type { ServiceHealth } from "../backend/protocol";
+import type { ServiceHealth } from "../adapters/tokenSavior/protocol";
 
 export type BackendIndicatorState = {
   kind: "idle" | "starting" | "ready" | "error";

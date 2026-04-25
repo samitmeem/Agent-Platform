@@ -11,16 +11,18 @@ import {
 } from "../agent/runtime";
 import { ToolApprovalDeniedError, ToolRouter } from "../agent/toolRouter";
 import { formatTraceEntries } from "../agent/trace";
-import { BackendGateway } from "../backend/gateway";
+import { BackendGateway } from "../adapters/tokenSavior/gateway";
 import {
-  extractFirstSymbolLocation,
   formatToolResult,
   tryParseJsonContent,
   type ServiceHealth,
-  type ServiceToolResult,
-} from "../backend/protocol";
+} from "../adapters/tokenSavior/protocol";
+import { extractSymbolLocation, formatToolResult as formatGenericToolResult, tryParseJsonContent as parseGenericJson, type ToolResult } from "../tools/interface";
+import { type ToolProviderRegistry } from "../tools/providerRegistry";
+import { type ToolPolicyRegistry } from "../policies/toolPolicy";
 import { buildMemoryPayloadFromRun, buildMemoryPayloadFromToolResult } from "../policies/memoryPolicy";
-import { resolveToolPolicy } from "../policies/toolPolicy";
+import { globalToolPolicyRegistry } from "../policies/toolPolicy";
+import type { MemoryCapability } from "../tools/interface";
 import type { ApprovalSettings } from "../policies/approvalPolicy";
 import { ModelProviderRegistry } from "../providers/registry";
 import {
@@ -36,7 +38,12 @@ import { showObservabilityPanel } from "../views/observabilityPanel";
 import { buildObservabilityHtml } from "../views/observabilityRenderer";
 
 export interface CommandEnvironment {
-  gateway: BackendGateway;
+  toolProviderRegistry: ToolProviderRegistry;
+  policyRegistry: ToolPolicyRegistry;
+  /** Optional direct gateway reference — used only for health/restart of the token-savior adapter. */
+  gateway?: BackendGateway;
+  /** Memory capability resolved from the active tool provider — passed to AgentRuntime. */
+  memoryCapability?: MemoryCapability;
   statusBar: BackendStatusBarController;
   outputChannel: vscode.OutputChannel;
   ui: CommandUi;
@@ -187,20 +194,21 @@ async function requestToolApproval(
 
 function createToolRouter(env: CommandEnvironment, workspaceRoot: string): ToolRouter {
   return new ToolRouter({
-    gateway: env.gateway,
+    toolProviderRegistry: env.toolProviderRegistry,
+    policyRegistry: env.policyRegistry,
     workspaceRoot,
     getApprovalSettings: env.getApprovalSettings,
     isWorkspaceTrusted: () => vscode.workspace.isTrusted,
     requestApproval: (request) => requestToolApproval(env.ui, request.title, request.summary, request.reason),
     onToolCompleted: async (toolName, result) => {
       const settings = env.getApprovalSettings();
-      const policy = resolveToolPolicy(toolName);
+      const policy = env.policyRegistry.resolve(toolName);
       if (!settings.autoSaveProjectMemory || !policy.mutatesWorkspace || toolName === "memory_save") {
         return;
       }
 
       const payload = buildMemoryPayloadFromToolResult(`${policy.title} result`, result);
-      await env.gateway.invokeTool(workspaceRoot, "memory_save", payload);
+      await env.toolProviderRegistry.routeTool("memory_save", payload, workspaceRoot);
     },
   });
 }
@@ -209,12 +217,12 @@ function createActionRuntimeToolExecutor(
   env: CommandEnvironment,
   workspaceRoot: string,
   query: string,
-): { invokeTool(workspaceRoot: string, name: string, argumentsPayload: Record<string, unknown>): Promise<ServiceToolResult> } {
+): { invokeTool(workspaceRoot: string, name: string, argumentsPayload: Record<string, unknown>): Promise<ToolResult> } {
   const router = createToolRouter(env, workspaceRoot);
   return {
     invokeTool: async (_root, name, argumentsPayload) => router.invokeTool({
       toolName: name,
-      title: `Action Agent: ${resolveToolPolicy(name).title}`,
+      title: `Action Agent: ${env.policyRegistry.resolve(name).title}`,
       argumentsPayload,
       approvalSummary: [
         `User request: ${query}`,
@@ -225,8 +233,8 @@ function createActionRuntimeToolExecutor(
   };
 }
 
-function extractCheckpointId(result: ServiceToolResult): string | undefined {
-  const payload = tryParseJsonContent<Record<string, unknown>>(result);
+function extractCheckpointId(result: ToolResult): string | undefined {
+  const payload = parseGenericJson<Record<string, unknown>>(result);
   return typeof payload?.checkpoint_id === "string"
     ? payload.checkpoint_id
     : typeof payload?.checkpoint === "object" && payload.checkpoint && "checkpoint_id" in payload.checkpoint
@@ -236,7 +244,7 @@ function extractCheckpointId(result: ServiceToolResult): string | undefined {
 
 async function persistCheckpointFromResult(
   env: CommandEnvironment,
-  result: ServiceToolResult | undefined,
+  result: ToolResult | undefined,
   filePath?: string,
 ): Promise<void> {
   if (!result) {
@@ -271,9 +279,9 @@ async function promptForSymbolName(
 
 async function revealSymbolLocation(
   workspaceRoot: string,
-  result: ServiceToolResult,
+  result: ToolResult,
 ): Promise<void> {
-  const location = extractFirstSymbolLocation(result);
+  const location = extractSymbolLocation(result);
   if (!location) {
     return;
   }
@@ -292,7 +300,7 @@ async function runToolCommand(
   title: string,
   toolName: string,
   argumentsPayload: Record<string, unknown> = {},
-): Promise<ServiceToolResult | undefined> {
+): Promise<ToolResult | undefined> {
   const workspaceRoot = env.getWorkspaceRoot();
   if (!workspaceRoot) {
     env.statusBar.setIdle("Open a workspace folder to run backend commands.");
@@ -312,7 +320,7 @@ async function runToolCommand(
       argumentsPayload,
       approvalSummary: `Tool: ${toolName}\nArguments: ${JSON.stringify(argumentsPayload)}`,
     });
-    const body = formatToolResult(result);
+    const body = formatGenericToolResult(result);
     appendToolRun(env.outputChannel, title, body);
 
     const failureMessage = deriveToolResultFailureMessage(result);
@@ -322,7 +330,7 @@ async function runToolCommand(
       return result;
     }
 
-    env.statusBar.setReady(env.gateway.getLastHealth(), `${title} complete.`);
+    env.statusBar.setReady(env.gateway?.getLastHealth(), `${title} complete.`);
     void env.ui.showInformationMessage(`${title} complete: ${summarizeBody(body)}`);
     return result;
   } catch (error) {
@@ -368,7 +376,7 @@ async function completeTrackedRun(
   },
 ) {
   const recorded = await recordPreviewRun({
-    gateway: env.gateway,
+    toolProviderRegistry: env.toolProviderRegistry,
     sessionStore: env.getSessionStore(),
     workspaceRoot,
     getApprovalSettings: env.getApprovalSettings,
@@ -460,7 +468,7 @@ export function registerCommands(
 
       env.statusBar.setStarting("Restarting backend…");
       try {
-        const health = await env.gateway.restart(workspaceRoot);
+        const health = await env.gateway?.restart(workspaceRoot);
         if (!health) {
           env.statusBar.setIdle("Backend stopped.");
           return;
@@ -846,8 +854,10 @@ export function registerCommands(
           workspaceRoot,
           providerRegistry: env.getProviderRegistry(),
           sessionStore: env.getSessionStore(),
+          listTools: () => env.toolProviderRegistry.listAllTools(),
+          memoryCapability: env.memoryCapability,
           toolExecutor: {
-            invokeTool: (root, name, argumentsPayload) => env.gateway.invokeTool(root, name, argumentsPayload),
+            invokeTool: (root, name, argumentsPayload) => env.toolProviderRegistry.routeTool(name, argumentsPayload, root),
           },
         });
         const result = await runtime.runPreview({
@@ -879,7 +889,7 @@ export function registerCommands(
           return;
         }
 
-        env.statusBar.setReady(env.gateway.getLastHealth(), "Preview agent complete.");
+        env.statusBar.setReady(env.gateway?.getLastHealth(), "Preview agent complete.");
         const autoSaveSuffix = recorded.memoryStatus.state === "saved"
           ? " Saved to project memory automatically."
           : "";
@@ -943,6 +953,8 @@ export function registerCommands(
           workspaceRoot,
           providerRegistry: env.getProviderRegistry(),
           sessionStore: env.getSessionStore(),
+          listTools: () => env.toolProviderRegistry.listAllTools(),
+          memoryCapability: env.memoryCapability,
           toolExecutor: createActionRuntimeToolExecutor(env, workspaceRoot, query.trim()),
         });
         const result = await runtime.runAction({
@@ -980,7 +992,7 @@ export function registerCommands(
           return;
         }
 
-        env.statusBar.setReady(env.gateway.getLastHealth(), "Action agent complete.");
+        env.statusBar.setReady(env.gateway?.getLastHealth(), "Action agent complete.");
         const autoSaveSuffix = recorded.memoryStatus.state === "saved"
           ? " Saved to project memory automatically."
           : "";
@@ -1148,7 +1160,7 @@ export function registerCommands(
     testCommands.push(
       vscode.commands.registerCommand(
         "tokenSaviorAgent.test.persistCheckpointFromToolResult",
-        async (input: { result: ServiceToolResult; filePath?: string }) => {
+        async (input: { result: ToolResult; filePath?: string }) => {
           await persistCheckpointFromResult(env, input.result, input.filePath);
           return env.getWorkspaceStore().getLastCheckpoint();
         },

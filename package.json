@@ -3,7 +3,7 @@
   "displayName": "Token Savior Agent",
   "description": "Backend-powered project intelligence, safe mutation workflows, checkpoints, and observability for Token Savior in VS Code.",
   "version": "0.1.0",
-  "publisher": "mibayy",
+  "publisher": "samitmeem",
   "preview": true,
   "icon": "media/icon.png",
   "license": "MIT",
@@ -14,11 +14,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/Mibayy/token-savior.git"
+    "url": "https://github.com/samitmeem/token-savior-vscode.git"
   },
-  "homepage": "https://github.com/Mibayy/token-savior#readme",
+  "homepage": "https://github.com/samitmeem/token-savior-vscode#readme",
   "bugs": {
-    "url": "https://github.com/Mibayy/token-savior/issues"
+    "url": "https://github.com/samitmeem/token-savior-vscode/issues"
   },
   "engines": {
     "vscode": "^1.99.0"
@@ -242,6 +242,11 @@
           "type": "string",
           "default": "",
           "description": "Optional absolute path to the Python executable used to launch the Token Savior backend."
+        },
+        "tokenSaviorAgent.backend.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable the Token Savior Python backend tool provider. Set to false to run the agent without any tool provider (direct-answer mode only)."
         },
         "tokenSaviorAgent.serviceModule": {
           "type": "string",

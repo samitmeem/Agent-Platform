@@ -1,4 +1,4 @@
-import { formatToolResult, tryParseJsonContent, type ServiceToolResult } from "../backend/protocol";
+import { formatToolResult, tryParseJsonContent, type ToolResult, type ToolDefinition, type MemoryCapability } from "../tools/interface";
 import type { ModelProvider, ProviderKind } from "../providers/base";
 import type { ModelProviderRegistry } from "../providers/registry";
 import type { PreviewRunOutcome, SessionStore } from "../state/sessionStore";
@@ -28,7 +28,7 @@ export interface AgentToolExecutor {
     workspaceRoot: string,
     name: string,
     argumentsPayload: Record<string, unknown>,
-  ): Promise<ServiceToolResult>;
+  ): Promise<ToolResult>;
 }
 
 export interface AgentRuntimeDependencies {
@@ -36,6 +36,10 @@ export interface AgentRuntimeDependencies {
   providerRegistry: ModelProviderRegistry;
   toolExecutor: AgentToolExecutor;
   sessionStore?: SessionStore;
+  /** Optional: list registered tools for dynamic planning and prompt generation. */
+  listTools?: () => Promise<ToolDefinition[]>;
+  /** Optional: memory tool name declarations from the active tool provider. */
+  memoryCapability?: MemoryCapability;
 }
 
 export interface AgentPreviewInput {
@@ -52,13 +56,13 @@ export interface AgentPreviewResult {
   plan: AgentPlan;
   answer: string;
   providerKind?: ProviderKind;
-  toolResult?: ServiceToolResult;
+  toolResult?: ToolResult;
   plans?: AgentPlan[];
-  toolResults?: ServiceToolResult[];
+  toolResults?: ToolResult[];
   trace: AgentTraceEntry[];
 }
 
-function getToolResults(result: AgentPreviewResult): ServiceToolResult[] {
+function getToolResults(result: AgentPreviewResult): ToolResult[] {
   if (result.toolResults && result.toolResults.length > 0) {
     return [...result.toolResults];
   }
@@ -66,7 +70,7 @@ function getToolResults(result: AgentPreviewResult): ServiceToolResult[] {
   return result.toolResult ? [result.toolResult] : [];
 }
 
-export function isToolResultFailure(result: ServiceToolResult): boolean {
+export function isToolResultFailure(result: ToolResult): boolean {
   if (!result.ok) {
     return true;
   }
@@ -75,7 +79,7 @@ export function isToolResultFailure(result: ServiceToolResult): boolean {
   return parsed?.ok === false;
 }
 
-export function deriveToolResultFailureMessage(result: ServiceToolResult): string | undefined {
+export function deriveToolResultFailureMessage(result: ToolResult): string | undefined {
   if (!isToolResultFailure(result)) {
     return undefined;
   }
@@ -137,7 +141,7 @@ function throwIfCancelled(signal?: AgentCancellationSignal): void {
   }
 }
 
-function formatToolResultsForSummary(results: readonly ServiceToolResult[]): string {
+function formatToolResultsForSummary(results: readonly ToolResult[]): string {
   return results.map((result, index) => [
     `Tool step ${index + 1}: ${result.name}`,
     formatToolResult(result),
@@ -230,6 +234,22 @@ export class AgentRuntime {
     let step = 1;
     const maxToolSteps = Math.max(input.maxToolSteps ?? (mode === "action" ? 3 : 2), 1);
     throwIfCancelled(input.cancellationSignal);
+
+    // Compute the dynamic tool manifest for the planner (non-fatal if unavailable).
+    let toolManifest: string | undefined;
+    let knownToolNames: ReadonlySet<string> | undefined;
+    if (this.dependencies.listTools) {
+      try {
+        const tools = await this.dependencies.listTools();
+        knownToolNames = new Set(tools.map((t) => t.name));
+        toolManifest = tools.length > 0
+          ? tools.map((t) => `- ${t.name} [${t.category}]: ${t.description}`).join("\n")
+          : "(no tools available — always return a direct response)";
+      } catch {
+        // Non-fatal: planner will operate in compat mode (accepts any tool name).
+      }
+    }
+
     if (mode === "action") {
       trace.push(traceEntry(step++, "control", "Running the agent in bounded action mode with approval-gated tool execution."));
     }
@@ -239,6 +259,7 @@ export class AgentRuntime {
         workspaceRoot: this.dependencies.workspaceRoot,
         toolExecutor: this.dependencies.toolExecutor,
         sessionStore: this.dependencies.sessionStore,
+        memoryCapability: this.dependencies.memoryCapability,
       });
       const memoryContext = await memoryBridge.buildContext(input.query);
       supplementalContext = buildAgentContext({
@@ -271,9 +292,11 @@ export class AgentRuntime {
       mode,
       provider,
       context: supplementalContext,
+      toolManifest,
+      knownToolNames,
     });
     const plans: AgentPlan[] = [];
-    const toolResults: ServiceToolResult[] = [];
+    const toolResults: ToolResult[] = [];
     const pushPlanTrace = (plan: AgentPlan, iteration: number): void => {
       trace.push(traceEntry(step++, "plan", iteration === 1 ? "Generated agent plan." : "Generated follow-up plan.", {
         iteration,
@@ -308,14 +331,13 @@ export class AgentRuntime {
         iteration: toolResults.length + 1,
       }));
       // FIX-5: Wrap each tool step so a transient error surfaces cleanly.
-      // FIX-4: Timeout is enforced inside gateway.invokeTool.
-      let toolResult: import("../backend/protocol").ServiceToolResult;
+      // FIX-4: Timeout is enforced inside the tool provider.
+      let toolResult: ToolResult;
       try {
         toolResult = await this.dependencies.toolExecutor.invokeTool(
           this.dependencies.workspaceRoot,
           currentPlan.toolName,
           currentPlan.arguments,
-          abortController.signal,
         );
       } catch (toolError) {
         const msg = toolError instanceof Error ? toolError.message : String(toolError);
@@ -328,7 +350,6 @@ export class AgentRuntime {
           ok: false,
           content: [`Error: ${msg}`],
           error: msg,
-          active_project: null,
         };
       }
       toolResults.push(toolResult);
@@ -355,6 +376,8 @@ export class AgentRuntime {
         context: supplementalContext,
         previousPlans: plans,
         previousToolResults: toolResults,
+        toolManifest,
+        knownToolNames,
       });
 
       if (!nextPlan) {

@@ -1,24 +1,21 @@
 /**
  * FIX-6: Dynamic tool registry.
  *
- * Old code: AgentToolName was a static TypeScript union of 10 tools.
- * Adding a tool to the Python backend had zero effect on agent planning.
+ * Populated at session start by calling listAllTools() on the ToolProviderRegistry.
+ * The planner receives the live list and includes it in the system prompt so the
+ * model can choose any available tool.
  *
- * New code: The registry is populated at session start by calling
- * capabilities.list on the backend. The planner receives the live list and
- * includes it in the system prompt so the model can choose any available tool.
+ * token-savior is no longer the source of truth — any registered ToolProvider
+ * contributes its tools to the manifest.
  */
 
-import type { BackendGateway } from "../backend/gateway";
+import type { ToolProviderRegistry } from "../tools/providerRegistry";
+import type { ToolDefinition } from "../tools/interface";
 
-export interface BackendCapability {
-  name: string;
-  category: string;
-  description: string;
-}
+export type BackendCapability = ToolDefinition;
 
 export class ToolRegistry {
-  private capabilities: BackendCapability[] = [];
+  private capabilities: ToolDefinition[] = [];
   private loadedAt: number | undefined;
 
   /** Reload if stale (older than 5 minutes) or never loaded. */
@@ -26,17 +23,17 @@ export class ToolRegistry {
     return this.loadedAt === undefined || Date.now() - this.loadedAt > 5 * 60_000;
   }
 
-  public async refresh(gateway: BackendGateway, workspaceRoot: string): Promise<void> {
+  public async refresh(providerRegistry: ToolProviderRegistry): Promise<void> {
     if (!this.isStale()) { return; }
     try {
-      this.capabilities = await gateway.listCapabilities(workspaceRoot);
+      this.capabilities = await providerRegistry.listAllTools();
       this.loadedAt = Date.now();
     } catch {
       // Non-fatal: planner falls back to the built-in heuristic tool list.
     }
   }
 
-  public list(): BackendCapability[] {
+  public list(): ToolDefinition[] {
     return this.capabilities;
   }
 

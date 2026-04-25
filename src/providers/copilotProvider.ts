@@ -25,8 +25,10 @@ function toChatMessage(message: ProviderMessage): vscode.LanguageModelChatMessag
     return vscode.LanguageModelChatMessage.Assistant(message.content);
   }
   if (message.role === "system") {
-    // VS Code LM API >= 1.90 supports System messages.
-    return vscode.LanguageModelChatMessage.System(message.content);
+    // @types/vscode 1.99 does not expose a System static factory.
+    // Fold system instructions into a User turn (standard practice for
+    // models that don't have a dedicated system slot).
+    return vscode.LanguageModelChatMessage.User(message.content);
   }
   return vscode.LanguageModelChatMessage.User(message.content);
 }

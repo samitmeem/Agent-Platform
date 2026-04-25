@@ -1,16 +1,7 @@
 export type AgentPlanSource = "model" | "heuristic";
 export type AgentRuntimeMode = "preview" | "action";
-export type AgentToolName =
-  | "get_project_summary"
-  | "find_symbol"
-  | "memory_search"
-  | "get_dependencies"
-  | "get_change_impact"
-  | "get_full_context"
-  | "discover_project_actions"
-  | "run_project_action"
-  | "run_impacted_tests"
-  | "apply_symbol_change_and_validate";
+/** Tool names are discovered dynamically from registered ToolProviders at runtime. */
+export type AgentToolName = string;
 
 export interface AgentDirectPlan {
   kind: "direct";

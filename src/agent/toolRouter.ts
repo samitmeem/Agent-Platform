@@ -1,8 +1,8 @@
-import type { ServiceToolResult } from "../backend/protocol";
-import type { BackendGateway } from "../backend/gateway";
+import type { ToolResult } from "../tools/interface";
+import type { ToolProviderRegistry } from "../tools/providerRegistry";
 import type { ApprovalSettings } from "../policies/approvalPolicy";
 import { shouldRequireApproval } from "../policies/approvalPolicy";
-import { resolveToolPolicy } from "../policies/toolPolicy";
+import type { ToolPolicyRegistry } from "../policies/toolPolicy";
 
 export class ToolApprovalDeniedError extends Error {
   public constructor(message = "Tool execution was cancelled by the approval policy.") {
@@ -19,12 +19,13 @@ export interface ToolApprovalRequest {
 }
 
 export interface ToolRouterDependencies {
-  gateway: BackendGateway;
+  toolProviderRegistry: ToolProviderRegistry;
+  policyRegistry: ToolPolicyRegistry;
   workspaceRoot: string;
   getApprovalSettings(): ApprovalSettings;
   isWorkspaceTrusted(): boolean;
   requestApproval?(request: ToolApprovalRequest): Promise<boolean>;
-  onToolCompleted?(toolName: string, result: ServiceToolResult): Promise<void> | void;
+  onToolCompleted?(toolName: string, result: ToolResult): Promise<void> | void;
 }
 
 export interface RoutedToolRequest {
@@ -38,8 +39,8 @@ export interface RoutedToolRequest {
 export class ToolRouter {
   public constructor(private readonly dependencies: ToolRouterDependencies) {}
 
-  public async invokeTool(request: RoutedToolRequest): Promise<ServiceToolResult> {
-    const policy = resolveToolPolicy(request.toolName);
+  public async invokeTool(request: RoutedToolRequest): Promise<ToolResult> {
+    const policy = this.dependencies.policyRegistry.resolve(request.toolName);
     const approval = shouldRequireApproval(
       policy,
       this.dependencies.getApprovalSettings(),
@@ -58,10 +59,10 @@ export class ToolRouter {
       }
     }
 
-    const result = await this.dependencies.gateway.invokeTool(
-      this.dependencies.workspaceRoot,
+    const result = await this.dependencies.toolProviderRegistry.routeTool(
       request.toolName,
       request.argumentsPayload ?? {},
+      this.dependencies.workspaceRoot,
     );
     await this.dependencies.onToolCompleted?.(request.toolName, result);
     return result;

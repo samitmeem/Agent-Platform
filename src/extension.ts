@@ -1,13 +1,16 @@
 import * as vscode from "vscode";
 
 import { ToolApprovalDeniedError, ToolRouter, type ToolApprovalRequest } from "./agent/toolRouter";
-import { BackendGateway } from "./backend/gateway";
-import { type ServiceHealth, type ServiceToolResult } from "./backend/protocol";
+import { BackendGateway } from "./adapters/tokenSavior/gateway";
+import { TokenSaviorToolProvider } from "./adapters/tokenSavior/adapter";
+import { type ServiceHealth } from "./adapters/tokenSavior/protocol";
+import type { ToolResult } from "./tools/interface";
+import { ToolProviderRegistry } from "./tools/providerRegistry";
+import { ToolPolicyRegistry, globalToolPolicyRegistry } from "./policies/toolPolicy";
 import {
   getPrimaryWorkspaceRoot,
   isTokenSaviorConfigurationChange,
   loadApprovalSettings,
-  loadBackendLaunchConfig,
   loadModelProviderSettings,
 } from "./config";
 import type { ApprovalSettings } from "./policies/approvalPolicy";
@@ -23,6 +26,8 @@ import { registerChatParticipant } from "./chat/participant";
 import { registerCommands } from "./commands";
 import { BackendStatusBarController } from "./ui/statusBar";
 
+let tokenSaviorProvider: TokenSaviorToolProvider | undefined;
+let toolProviderRegistry: ToolProviderRegistry | undefined;
 let gateway: BackendGateway | undefined;
 let providerRegistry: ModelProviderRegistry | undefined;
 
@@ -92,7 +97,7 @@ function registerTestCommands(
     ),
     vscode.commands.registerCommand(
       "tokenSaviorAgent.test.setToolResponses",
-      (entries: Array<{ toolName: string; response: ServiceToolResult | ServiceToolResult[] }>) => {
+      (entries: Array<{ toolName: string; response: ToolResult | ToolResult[] }>) => {
         for (const entry of entries) {
           testHarness?.setToolResponses(entry.toolName, entry.response);
         }
@@ -157,7 +162,7 @@ function registerTestCommands(
         approvalDecision?: boolean;
         workspaceTrusted?: boolean;
         approvalSettings?: Partial<ApprovalSettings>;
-        result?: Partial<ServiceToolResult>;
+        result?: Partial<ToolResult>;
       }) => {
         let approvalRequested = false;
         let approvalRequest: ToolApprovalRequest | undefined;
@@ -167,19 +172,20 @@ function registerTestCommands(
           ...loadApprovalSettings(),
           ...(input.approvalSettings ?? {}),
         };
+        const mockRegistry = {
+          routeTool: async (_name: string, _args: Record<string, unknown>, _root: string): Promise<ToolResult> => {
+            invoked = true;
+            return {
+              name: _name,
+              ok: input.result?.ok ?? true,
+              content: input.result?.content ?? ["ok"],
+              error: input.result?.error ?? null,
+            };
+          },
+        } as unknown as ToolProviderRegistry;
         const router = new ToolRouter({
-          gateway: {
-            invokeTool: async (_workspaceRoot: string, toolName: string): Promise<ServiceToolResult> => {
-              invoked = true;
-              return {
-                name: toolName,
-                ok: input.result?.ok ?? true,
-                content: input.result?.content ?? ["ok"],
-                error: input.result?.error ?? null,
-                active_project: input.result?.active_project ?? (getPrimaryWorkspaceRoot() ?? "test-workspace"),
-              };
-            },
-          } as never,
+          toolProviderRegistry: mockRegistry,
+          policyRegistry: globalToolPolicyRegistry,
           workspaceRoot: getPrimaryWorkspaceRoot() ?? "test-workspace",
           getApprovalSettings: () => settings,
           isWorkspaceTrusted: () => input.workspaceTrusted ?? vscode.workspace.isTrusted,
@@ -233,15 +239,40 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const telemetryState = new TelemetryState(context.workspaceState);
   workspaceStore.hydrateSessionStore(sessionStore);
   const runHistoryTreeProvider = new AgentRunHistoryTreeProvider(sessionStore);
-  gateway = new BackendGateway(loadBackendLaunchConfig);
+
+  // Build the platform registries
+  const policyRegistry = globalToolPolicyRegistry;
+  toolProviderRegistry = new ToolProviderRegistry();
+
+  // Register the token-savior adapter — conditional on the backend.enabled setting
+  const isBackendEnabled = vscode.workspace.getConfiguration("tokenSaviorAgent").get<boolean>("backend.enabled") ?? true;
+  if (isBackendEnabled) {
+    tokenSaviorProvider = new TokenSaviorToolProvider(
+      (workspaceRoot) => {
+        const config = vscode.workspace.getConfiguration("tokenSaviorAgent");
+        return {
+          workspaceRoot,
+          configuredPythonPath: config.get<string>("pythonPath") ?? undefined,
+          serviceModule: config.get<string>("serviceModule") ?? undefined,
+        };
+      },
+      policyRegistry,
+    );
+    toolProviderRegistry.registerProvider(tokenSaviorProvider);
+    gateway = tokenSaviorProvider.getGateway();
+  }
+
   const testHarness = context.extensionMode === vscode.ExtensionMode.Test ? new ExtensionTestHarness() : undefined;
+  let effectiveRegistry = toolProviderRegistry;
   if (testHarness) {
-    const invokeTool = gateway.invokeTool.bind(gateway);
-    gateway.invokeTool = (workspaceRoot: string, name: string, argumentsPayload: Record<string, unknown> = {}) => testHarness.invokeTool(
-      invokeTool,
-      workspaceRoot,
+    // Wrap the registry so the test harness can intercept tool calls
+    const originalRoute = toolProviderRegistry.routeTool.bind(toolProviderRegistry);
+    effectiveRegistry = Object.create(toolProviderRegistry) as ToolProviderRegistry;
+    effectiveRegistry.routeTool = (name, args, root) => testHarness.invokeTool(
+      (_root, _name, _args) => originalRoute(_name, _args ?? {}, _root),
+      root,
       name,
-      argumentsPayload,
+      args,
     );
   }
   const createProviderRegistry = (): ModelProviderRegistry => {
@@ -271,6 +302,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       statusBar.setIdle("Open a workspace folder to connect.");
       return undefined;
     }
+    if (!gateway) {
+      statusBar.setIdle("No backend configured.");
+      return undefined;
+    }
 
     statusBar.setStarting(`Checking backend (${reason})…`);
     try {
@@ -285,7 +320,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   }
 
   registerCommands(context, {
+    toolProviderRegistry: effectiveRegistry,
+    policyRegistry,
     gateway,
+    memoryCapability: toolProviderRegistry.resolveMemoryCapability(),
     statusBar,
     outputChannel,
     ui: testHarness ?? defaultCommandUi,
@@ -300,7 +338,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   });
 
   const chatParticipant = registerChatParticipant(context, {
+    toolProviderRegistry: effectiveRegistry,
     gateway,
+    memoryCapability: toolProviderRegistry.resolveMemoryCapability(),
     statusBar,
     outputChannel,
     getWorkspaceRoot: getPrimaryWorkspaceRoot,
@@ -348,7 +388,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }),
     {
       dispose: () => {
-        void gateway?.stop();
+        void toolProviderRegistry?.disposeAll();
+        toolProviderRegistry = undefined;
+        tokenSaviorProvider = undefined;
         gateway = undefined;
         providerRegistry = undefined;
       },
@@ -359,7 +401,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 }
 
 export async function deactivate(): Promise<void> {
-  await gateway?.stop();
+  await toolProviderRegistry?.disposeAll();
+  toolProviderRegistry = undefined;
+  tokenSaviorProvider = undefined;
   gateway = undefined;
   providerRegistry = undefined;
 }
