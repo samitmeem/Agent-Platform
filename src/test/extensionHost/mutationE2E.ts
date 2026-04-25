@@ -50,13 +50,13 @@ async function selectReplacementBlock(editor: vscode.TextEditor, blockName: stri
 }
 
 async function enqueueApproval(): Promise<void> {
-  await vscode.commands.executeCommand("tokenSaviorAgent.test.enqueueWarningMessageResponses", ["Approve"]);
+  await vscode.commands.executeCommand("agentPlatform.test.enqueueWarningMessageResponses", ["Approve"]);
 }
 
 async function runActionCommand(query: string): Promise<void> {
-  await vscode.commands.executeCommand("tokenSaviorAgent.test.enqueueInputBoxResponses", [query]);
+  await vscode.commands.executeCommand("agentPlatform.test.enqueueInputBoxResponses", [query]);
   await enqueueApproval();
-  await vscode.commands.executeCommand("tokenSaviorAgent.askAgentAction");
+  await vscode.commands.executeCommand("agentPlatform.askAgentAction");
 }
 
 function getLatestActionRun(runs: StoredPreviewRun[], query: string): StoredPreviewRun | undefined {
@@ -93,7 +93,7 @@ export async function runMutationE2ETests(): Promise<void> {
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   assert.ok(workspaceRoot, "Expected the disposable mutation workspace to be available.");
 
-  await vscode.commands.executeCommand("tokenSaviorAgent.test.resetState");
+  await vscode.commands.executeCommand("agentPlatform.test.resetState");
 
   const editor = await openWorkspaceDocument(workspaceRoot, "src/demo_module.py");
   await selectReplacementBlock(editor, "SUCCESS_REPLACEMENT");
@@ -102,7 +102,7 @@ export async function runMutationE2ETests(): Promise<void> {
   const successContent = await readWorkspaceFile(workspaceRoot, "src/demo_module.py");
   assert.match(successContent, /return f\"Hi there, \{name\}!\"/);
 
-  const runsAfterSuccess = await vscode.commands.executeCommand<StoredPreviewRun[]>("tokenSaviorAgent.test.listPreviewRuns");
+  const runsAfterSuccess = await vscode.commands.executeCommand<StoredPreviewRun[]>("agentPlatform.test.listPreviewRuns");
   const successRun = getLatestActionRun(runsAfterSuccess ?? [], "Apply the selected text to greet and validate");
   assert.ok(successRun, "Expected a successful mutation action run to be recorded.");
   assert.equal(successRun?.outcome, "completed");
@@ -112,11 +112,11 @@ export async function runMutationE2ETests(): Promise<void> {
   assert.equal((successPayload?.validation as { ok?: unknown } | undefined)?.ok, true);
   assert.match(JSON.stringify((successPayload?.validation as { selection?: unknown } | undefined)?.selection ?? {}), /test_demo_module\.py/i);
 
-  const firstCheckpoint = await vscode.commands.executeCommand<LastCheckpointRecord | undefined>("tokenSaviorAgent.test.getLastCheckpoint");
+  const firstCheckpoint = await vscode.commands.executeCommand<LastCheckpointRecord | undefined>("agentPlatform.test.getLastCheckpoint");
   assert.ok(firstCheckpoint?.checkpointId, "Expected the successful mutation to persist a checkpoint id.");
   assert.equal(firstCheckpoint?.filePath?.replace(/\\/g, "/"), "src/demo_module.py");
 
-  const telemetryAfterSuccess = await vscode.commands.executeCommand<TelemetrySnapshot>("tokenSaviorAgent.test.getTelemetrySnapshot");
+  const telemetryAfterSuccess = await vscode.commands.executeCommand<TelemetrySnapshot>("agentPlatform.test.getTelemetrySnapshot");
   assert.equal(telemetryAfterSuccess?.totalRuns, 1);
   assert.equal(telemetryAfterSuccess?.actionRuns, 1);
   assert.equal(telemetryAfterSuccess?.completedRuns, 1);
@@ -130,7 +130,7 @@ export async function runMutationE2ETests(): Promise<void> {
   const contentAfterFailure = await readWorkspaceFile(workspaceRoot, "src/demo_module.py");
   assert.equal(contentAfterFailure, contentBeforeFailure, "Expected the failed mutation to be rolled back to the previous checkpoint state.");
 
-  const runsAfterFailure = await vscode.commands.executeCommand<StoredPreviewRun[]>("tokenSaviorAgent.test.listPreviewRuns");
+  const runsAfterFailure = await vscode.commands.executeCommand<StoredPreviewRun[]>("agentPlatform.test.listPreviewRuns");
   const failedRun = getLatestActionRun(runsAfterFailure ?? [], "Apply the selected text to greet and validate again");
   assert.ok(failedRun, "Expected a failed mutation action run to be recorded.");
   assert.equal(failedRun?.outcome, "failed");
@@ -139,19 +139,19 @@ export async function runMutationE2ETests(): Promise<void> {
   assert.equal(failedPayload?.ok, false);
   assert.equal((failedPayload?.rollback as { ok?: unknown } | undefined)?.ok, true);
 
-  const telemetryAfterFailure = await vscode.commands.executeCommand<TelemetrySnapshot>("tokenSaviorAgent.test.getTelemetrySnapshot");
+  const telemetryAfterFailure = await vscode.commands.executeCommand<TelemetrySnapshot>("agentPlatform.test.getTelemetrySnapshot");
   assert.equal(telemetryAfterFailure?.totalRuns, 2);
   assert.equal(telemetryAfterFailure?.completedRuns, 1);
   assert.equal(telemetryAfterFailure?.failedRuns, 1);
   assert.match(telemetryAfterFailure?.lastFailureMessage ?? "", /validation failed|apply_symbol_change_and_validate/i);
 
   await vscode.commands.executeCommand("workbench.action.closeAllEditors");
-  await vscode.commands.executeCommand("tokenSaviorAgent.showObservabilityDashboard", failedRun?.id);
-  const observabilityPanel = await vscode.commands.executeCommand<ObservabilityPanelSnapshot | undefined>("tokenSaviorAgent.test.getLastObservabilityPanel");
+  await vscode.commands.executeCommand("agentPlatform.showObservabilityDashboard", failedRun?.id);
+  const observabilityPanel = await vscode.commands.executeCommand<ObservabilityPanelSnapshot | undefined>("agentPlatform.test.getLastObservabilityPanel");
   assert.match(observabilityPanel?.html ?? "", /Latest checkpoint/);
   assert.match(observabilityPanel?.html ?? "", /Last failure:/);
 
-  const checkpointBeforeRestore = await vscode.commands.executeCommand<LastCheckpointRecord | undefined>("tokenSaviorAgent.test.getLastCheckpoint");
+  const checkpointBeforeRestore = await vscode.commands.executeCommand<LastCheckpointRecord | undefined>("agentPlatform.test.getLastCheckpoint");
   assert.ok(checkpointBeforeRestore?.checkpointId, "Expected the rollback attempt to keep a restorable checkpoint id.");
   const checkpointState = await readWorkspaceFile(workspaceRoot, "src/demo_module.py");
 
@@ -160,12 +160,12 @@ export async function runMutationE2ETests(): Promise<void> {
   assert.notEqual(driftedContent, checkpointState, "Expected the manual drift to diverge from the checkpoint state.");
 
   await enqueueApproval();
-  await vscode.commands.executeCommand("tokenSaviorAgent.restoreLastCheckpoint");
+  await vscode.commands.executeCommand("agentPlatform.restoreLastCheckpoint");
 
   const restoredContent = await readWorkspaceFile(workspaceRoot, "src/demo_module.py");
   assert.equal(restoredContent, checkpointState, "Expected restoreCheckpoint to return the file to the selected checkpoint state.");
 
-  const toolInvocations = await vscode.commands.executeCommand<ToolInvocationRecord[]>("tokenSaviorAgent.test.getToolInvocations");
+  const toolInvocations = await vscode.commands.executeCommand<ToolInvocationRecord[]>("agentPlatform.test.getToolInvocations");
   const restoreInvocation = toolInvocations?.find((call) => call.toolName === "restore_checkpoint");
   assert.ok(restoreInvocation, "Expected restoreCheckpoint to invoke the destructive restore tool.");
   assert.equal(restoreInvocation?.argumentsPayload.checkpoint_id, checkpointBeforeRestore.checkpointId);

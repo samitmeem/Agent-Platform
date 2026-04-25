@@ -426,7 +426,7 @@ export function registerCommands(
   env: CommandEnvironment,
 ): void {
   const pingCommand = vscode.commands.registerCommand(
-    "tokenSaviorAgent.pingBackend",
+    "agentPlatform.pingBackend",
     async () => {
       const workspaceRoot = env.getWorkspaceRoot();
       if (!workspaceRoot) {
@@ -455,7 +455,7 @@ export function registerCommands(
   );
 
   const restartCommand = vscode.commands.registerCommand(
-    "tokenSaviorAgent.restartBackend",
+    "agentPlatform.restartBackend",
     async () => {
       const workspaceRoot = env.getWorkspaceRoot();
       if (!workspaceRoot) {
@@ -488,14 +488,14 @@ export function registerCommands(
   );
 
   const projectSummaryCommand = vscode.commands.registerCommand(
-    "tokenSaviorAgent.projectSummary",
+    "agentPlatform.projectSummary",
     async () => {
       await runToolCommand(env, "Project Summary", "get_project_summary");
     },
   );
 
   const analyzeCurrentSymbolCommand = vscode.commands.registerCommand(
-    "tokenSaviorAgent.analyzeCurrentSymbol",
+    "agentPlatform.analyzeCurrentSymbol",
     async () => {
       const workspaceRoot = env.getWorkspaceRoot();
       if (!workspaceRoot) {
@@ -528,7 +528,7 @@ export function registerCommands(
   );
 
   const findSymbolCommand = vscode.commands.registerCommand(
-    "tokenSaviorAgent.findSymbol",
+    "agentPlatform.findSymbol",
     async () => {
       const workspaceRoot = env.getWorkspaceRoot();
       if (!workspaceRoot) {
@@ -562,7 +562,7 @@ export function registerCommands(
   );
 
   const searchMemoryCommand = vscode.commands.registerCommand(
-    "tokenSaviorAgent.searchMemory",
+    "agentPlatform.searchMemory",
     async () => {
       const query = await env.ui.showInputBox({
         prompt: "Search project memory",
@@ -582,21 +582,21 @@ export function registerCommands(
   );
 
   const reindexWorkspaceCommand = vscode.commands.registerCommand(
-    "tokenSaviorAgent.reindexWorkspace",
+    "agentPlatform.reindexWorkspace",
     async () => {
       await runToolCommand(env, "Reindex Workspace", "reindex", {});
     },
   );
 
   const discoverProjectActionsCommand = vscode.commands.registerCommand(
-    "tokenSaviorAgent.discoverProjectActions",
+    "agentPlatform.discoverProjectActions",
     async () => {
       await runToolCommand(env, "Discover Project Actions", "discover_project_actions", {});
     },
   );
 
   const runProjectActionCommand = vscode.commands.registerCommand(
-    "tokenSaviorAgent.runProjectAction",
+    "agentPlatform.runProjectAction",
     async () => {
       const workspaceRoot = env.getWorkspaceRoot();
       if (!workspaceRoot) {
@@ -632,7 +632,7 @@ export function registerCommands(
   );
 
   const runImpactedTestsCommand = vscode.commands.registerCommand(
-    "tokenSaviorAgent.runImpactedTests",
+    "agentPlatform.runImpactedTests",
     async () => {
       const workspaceRoot = env.getWorkspaceRoot();
       if (!workspaceRoot) {
@@ -663,7 +663,7 @@ export function registerCommands(
   );
 
   const applySelectedTextToSymbolCommand = vscode.commands.registerCommand(
-    "tokenSaviorAgent.applySelectedTextToSymbol",
+    "agentPlatform.applySelectedTextToSymbol",
     async () => {
       const workspaceRoot = env.getWorkspaceRoot();
       if (!workspaceRoot) {
@@ -704,14 +704,14 @@ export function registerCommands(
   );
 
   const listCheckpointsCommand = vscode.commands.registerCommand(
-    "tokenSaviorAgent.listCheckpoints",
+    "agentPlatform.listCheckpoints",
     async () => {
       await runToolCommand(env, "List Checkpoints", "list_checkpoints", {});
     },
   );
 
   const restoreCheckpointCommand = vscode.commands.registerCommand(
-    "tokenSaviorAgent.restoreCheckpoint",
+    "agentPlatform.restoreCheckpoint",
     async () => {
       const workspaceRoot = env.getWorkspaceRoot();
       if (!workspaceRoot) {
@@ -753,7 +753,7 @@ export function registerCommands(
   );
 
   const restoreLastCheckpointCommand = vscode.commands.registerCommand(
-    "tokenSaviorAgent.restoreLastCheckpoint",
+    "agentPlatform.restoreLastCheckpoint",
     async () => {
       const record = env.getWorkspaceStore().getLastCheckpoint();
       if (!record) {
@@ -768,7 +768,7 @@ export function registerCommands(
   );
 
   const showDependenciesCommand = vscode.commands.registerCommand(
-    "tokenSaviorAgent.showDependencies",
+    "agentPlatform.showDependencies",
     async () => {
       const name = await promptForSymbolName(
         env,
@@ -788,7 +788,7 @@ export function registerCommands(
   );
 
   const showChangeImpactCommand = vscode.commands.registerCommand(
-    "tokenSaviorAgent.showChangeImpact",
+    "agentPlatform.showChangeImpact",
     async () => {
       const name = await promptForSymbolName(
         env,
@@ -808,14 +808,14 @@ export function registerCommands(
   );
 
   const providerStatusCommand = vscode.commands.registerCommand(
-    "tokenSaviorAgent.showProviderStatus",
+    "agentPlatform.showProviderStatus",
     async () => {
       await showProviderStatus(env);
     },
   );
 
   const agentPreviewCommand = vscode.commands.registerCommand(
-    "tokenSaviorAgent.askAgentPreview",
+    "agentPlatform.askAgentPreview",
     async () => {
       const workspaceRoot = env.getWorkspaceRoot();
       if (!workspaceRoot) {
@@ -914,7 +914,7 @@ export function registerCommands(
   );
 
   const agentActionCommand = vscode.commands.registerCommand(
-    "tokenSaviorAgent.askAgentAction",
+    "agentPlatform.askAgentAction",
     async () => {
       const workspaceRoot = env.getWorkspaceRoot();
       if (!workspaceRoot) {
@@ -1029,7 +1029,7 @@ export function registerCommands(
   );
 
   const observabilityDashboardCommand = vscode.commands.registerCommand(
-    "tokenSaviorAgent.showObservabilityDashboard",
+    "agentPlatform.showObservabilityDashboard",
     async (runId?: string) => {
       showObservabilityPanel(
         context,
@@ -1043,7 +1043,7 @@ export function registerCommands(
   );
 
   const lastAgentTraceCommand = vscode.commands.registerCommand(
-    "tokenSaviorAgent.showLastAgentTrace",
+    "agentPlatform.showLastAgentTrace",
     async () => {
       const run = env.getSessionStore().getLastPreviewRun();
       showStoredPreviewRun(env, run, "Last Agent Trace");
@@ -1051,7 +1051,7 @@ export function registerCommands(
   );
 
   const showStoredAgentRunCommand = vscode.commands.registerCommand(
-    "tokenSaviorAgent.showStoredAgentRun",
+    "agentPlatform.showStoredAgentRun",
     async (runId?: string) => {
       const run = typeof runId === "string"
         ? env.getSessionStore().getPreviewRun(runId)
@@ -1061,7 +1061,7 @@ export function registerCommands(
   );
 
   const agentRunHistoryCommand = vscode.commands.registerCommand(
-    "tokenSaviorAgent.showAgentRunHistory",
+    "agentPlatform.showAgentRunHistory",
     async () => {
       const runs = env.getSessionStore().listPreviewRuns();
       if (runs.length === 0) {
@@ -1095,7 +1095,7 @@ export function registerCommands(
   );
 
   const clearAgentRunHistoryCommand = vscode.commands.registerCommand(
-    "tokenSaviorAgent.clearAgentRunHistory",
+    "agentPlatform.clearAgentRunHistory",
     async () => {
       const runs = env.getSessionStore().listPreviewRuns();
       if (runs.length === 0) {
@@ -1121,7 +1121,7 @@ export function registerCommands(
   );
 
   const saveLastRunToMemoryCommand = vscode.commands.registerCommand(
-    "tokenSaviorAgent.saveLastRunToMemory",
+    "agentPlatform.saveLastRunToMemory",
     async () => {
       const run = env.getSessionStore().getLastPreviewRun();
       if (!run) {
@@ -1146,7 +1146,7 @@ export function registerCommands(
   );
 
   const promoteProjectMemoryCommand = vscode.commands.registerCommand(
-    "tokenSaviorAgent.promoteProjectMemory",
+    "agentPlatform.promoteProjectMemory",
     async () => {
       await runToolCommand(env, "Promote Project Memory", "memory_maintain", {
         action: "promote",
@@ -1159,18 +1159,18 @@ export function registerCommands(
   if (context.extensionMode === vscode.ExtensionMode.Test) {
     testCommands.push(
       vscode.commands.registerCommand(
-        "tokenSaviorAgent.test.persistCheckpointFromToolResult",
+        "agentPlatform.test.persistCheckpointFromToolResult",
         async (input: { result: ToolResult; filePath?: string }) => {
           await persistCheckpointFromResult(env, input.result, input.filePath);
           return env.getWorkspaceStore().getLastCheckpoint();
         },
       ),
       vscode.commands.registerCommand(
-        "tokenSaviorAgent.test.getLastCheckpoint",
+        "agentPlatform.test.getLastCheckpoint",
         () => env.getWorkspaceStore().getLastCheckpoint(),
       ),
       vscode.commands.registerCommand(
-        "tokenSaviorAgent.test.renderObservabilityHtml",
+        "agentPlatform.test.renderObservabilityHtml",
         (runId?: string) => buildObservabilityHtml(
           env.getSessionStore(),
           env.getTelemetryState().getSnapshot(),

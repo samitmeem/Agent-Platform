@@ -63,7 +63,7 @@ function registerTestCommands(
 
   context.subscriptions.push(
     vscode.commands.registerCommand(
-      "tokenSaviorAgent.test.resetState",
+      "agentPlatform.test.resetState",
       async () => {
         sessionStore.clear();
         await workspaceStore.persistPreviewRuns([]);
@@ -75,28 +75,28 @@ function registerTestCommands(
       },
     ),
     vscode.commands.registerCommand(
-      "tokenSaviorAgent.test.enqueueInputBoxResponses",
+      "agentPlatform.test.enqueueInputBoxResponses",
       (responses: string[]) => {
         testHarness?.enqueueInputBoxResponses(responses);
         return true;
       },
     ),
     vscode.commands.registerCommand(
-      "tokenSaviorAgent.test.enqueueQuickPickResponses",
+      "agentPlatform.test.enqueueQuickPickResponses",
       (responses: string[]) => {
         testHarness?.enqueueQuickPickResponses(responses);
         return true;
       },
     ),
     vscode.commands.registerCommand(
-      "tokenSaviorAgent.test.enqueueWarningMessageResponses",
+      "agentPlatform.test.enqueueWarningMessageResponses",
       (responses: string[]) => {
         testHarness?.enqueueWarningMessageResponses(responses);
         return true;
       },
     ),
     vscode.commands.registerCommand(
-      "tokenSaviorAgent.test.setToolResponses",
+      "agentPlatform.test.setToolResponses",
       (entries: Array<{ toolName: string; response: ToolResult | ToolResult[] }>) => {
         for (const entry of entries) {
           testHarness?.setToolResponses(entry.toolName, entry.response);
@@ -105,22 +105,22 @@ function registerTestCommands(
       },
     ),
     vscode.commands.registerCommand(
-      "tokenSaviorAgent.test.clearToolResponses",
+      "agentPlatform.test.clearToolResponses",
       (toolName?: string) => {
         testHarness?.clearToolResponses(toolName);
         return true;
       },
     ),
     vscode.commands.registerCommand(
-      "tokenSaviorAgent.test.getToolInvocations",
+      "agentPlatform.test.getToolInvocations",
       () => testHarness?.getToolInvocations() ?? [],
     ),
     vscode.commands.registerCommand(
-      "tokenSaviorAgent.test.getLastObservabilityPanel",
+      "agentPlatform.test.getLastObservabilityPanel",
       () => testHarness?.getLastObservabilityPanel(),
     ),
     vscode.commands.registerCommand(
-      "tokenSaviorAgent.test.seedPreviewRun",
+      "agentPlatform.test.seedPreviewRun",
       async (run: StoredPreviewRun, options?: { recordTelemetry?: boolean }) => {
         sessionStore.savePreviewRun(run);
         await workspaceStore.persistPreviewRuns(sessionStore.listPreviewRuns(20));
@@ -131,30 +131,30 @@ function registerTestCommands(
       },
     ),
     vscode.commands.registerCommand(
-      "tokenSaviorAgent.test.listPreviewRuns",
+      "agentPlatform.test.listPreviewRuns",
       () => sessionStore.listPreviewRuns(),
     ),
     vscode.commands.registerCommand(
-      "tokenSaviorAgent.test.seedActiveRun",
+      "agentPlatform.test.seedActiveRun",
       async (record: ActiveRunRecord) => {
         await workspaceStore.saveActiveRun(record);
         return true;
       },
     ),
     vscode.commands.registerCommand(
-      "tokenSaviorAgent.test.getActiveRun",
+      "agentPlatform.test.getActiveRun",
       () => workspaceStore.getActiveRun(),
     ),
     vscode.commands.registerCommand(
-      "tokenSaviorAgent.test.getTelemetrySnapshot",
+      "agentPlatform.test.getTelemetrySnapshot",
       () => telemetryState.getSnapshot(),
     ),
     vscode.commands.registerCommand(
-      "tokenSaviorAgent.test.runRecoveryCheck",
+      "agentPlatform.test.runRecoveryCheck",
       async () => recoverInterruptedRun(workspaceStore, telemetryState, outputChannel),
     ),
     vscode.commands.registerCommand(
-      "tokenSaviorAgent.test.simulateToolRouting",
+      "agentPlatform.test.simulateToolRouting",
       async (input: {
         toolName: string;
         argumentsPayload?: Record<string, unknown>;
@@ -245,11 +245,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   toolProviderRegistry = new ToolProviderRegistry();
 
   // Register the token-savior adapter — conditional on the backend.enabled setting
-  const isBackendEnabled = vscode.workspace.getConfiguration("tokenSaviorAgent").get<boolean>("backend.enabled") ?? true;
+  const isBackendEnabled = vscode.workspace.getConfiguration("agentPlatform").get<boolean>("backend.enabled") ?? true;
   if (isBackendEnabled) {
     tokenSaviorProvider = new TokenSaviorToolProvider(
       (workspaceRoot) => {
-        const config = vscode.workspace.getConfiguration("tokenSaviorAgent");
+        const config = vscode.workspace.getConfiguration("agentPlatform");
         return {
           workspaceRoot,
           configuredPythonPath: config.get<string>("pythonPath") ?? undefined,
@@ -369,7 +369,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         void workspaceStore.persistPreviewRuns(sessionStore.listPreviewRuns(20));
       }),
     },
-    vscode.window.registerTreeDataProvider("tokenSaviorAgent.runHistory", runHistoryTreeProvider),
+    vscode.window.registerTreeDataProvider("agentPlatform.runHistory", runHistoryTreeProvider),
     vscode.workspace.onDidChangeConfiguration((event) => {
       if (!isTokenSaviorConfigurationChange(event)) {
         return;

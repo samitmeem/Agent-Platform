@@ -10,7 +10,7 @@ import {
 export class BackendStatusBarController implements vscode.Disposable {
   private readonly item: vscode.StatusBarItem;
 
-  public constructor(command = "tokenSaviorAgent.pingBackend") {
+  public constructor(command = "agentPlatform.pingBackend") {
     this.item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
     this.item.command = command;
     this.item.name = "Token Savior Backend";

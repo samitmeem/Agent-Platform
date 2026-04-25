@@ -29,14 +29,14 @@ interface SimulatedToolRoutingResult {
 }
 
 const REQUIRED_COMMANDS = [
-  "tokenSaviorAgent.pingBackend",
-  "tokenSaviorAgent.restartBackend",
-  "tokenSaviorAgent.askAgentPreview",
-  "tokenSaviorAgent.askAgentAction",
-  "tokenSaviorAgent.showLastAgentTrace",
-  "tokenSaviorAgent.showAgentRunHistory",
-  "tokenSaviorAgent.showProviderStatus",
-  "tokenSaviorAgent.showObservabilityDashboard",
+  "agentPlatform.pingBackend",
+  "agentPlatform.restartBackend",
+  "agentPlatform.askAgentPreview",
+  "agentPlatform.askAgentAction",
+  "agentPlatform.showLastAgentTrace",
+  "agentPlatform.showAgentRunHistory",
+  "agentPlatform.showProviderStatus",
+  "agentPlatform.showObservabilityDashboard",
 ] as const;
 
 function createMockToolResult(
@@ -105,32 +105,32 @@ export async function runSmokeTests(): Promise<void> {
     assert.ok(commands.includes(command), `Expected command ${command} to be contributed after activation.`);
   }
 
-  const config = vscode.workspace.getConfiguration("tokenSaviorAgent");
+  const config = vscode.workspace.getConfiguration("agentPlatform");
   assert.equal(config.get("persistRunHistory"), true);
   assert.equal(config.get("autoSaveProjectMemory"), false);
 
-  await vscode.commands.executeCommand("tokenSaviorAgent.test.resetState");
+  await vscode.commands.executeCommand("agentPlatform.test.resetState");
 
-  await vscode.commands.executeCommand("tokenSaviorAgent.pingBackend");
-  await vscode.commands.executeCommand("tokenSaviorAgent.restartBackend");
-  await vscode.commands.executeCommand("tokenSaviorAgent.showProviderStatus");
-  await vscode.commands.executeCommand("tokenSaviorAgent.showLastAgentTrace");
-  await vscode.commands.executeCommand("tokenSaviorAgent.showAgentRunHistory");
+  await vscode.commands.executeCommand("agentPlatform.pingBackend");
+  await vscode.commands.executeCommand("agentPlatform.restartBackend");
+  await vscode.commands.executeCommand("agentPlatform.showProviderStatus");
+  await vscode.commands.executeCommand("agentPlatform.showLastAgentTrace");
+  await vscode.commands.executeCommand("agentPlatform.showAgentRunHistory");
 
   const seededRun = createSeededRun();
-  await vscode.commands.executeCommand("tokenSaviorAgent.test.seedPreviewRun", seededRun, { recordTelemetry: true });
+  await vscode.commands.executeCommand("agentPlatform.test.seedPreviewRun", seededRun, { recordTelemetry: true });
 
-  const runs = await vscode.commands.executeCommand<StoredPreviewRun[]>("tokenSaviorAgent.test.listPreviewRuns");
+  const runs = await vscode.commands.executeCommand<StoredPreviewRun[]>("agentPlatform.test.listPreviewRuns");
   assert.ok(runs?.some((run) => run.id === seededRun.id), "Expected the seeded preview run to be present in session state.");
 
-  const telemetry = await vscode.commands.executeCommand<TelemetrySnapshot>("tokenSaviorAgent.test.getTelemetrySnapshot");
+  const telemetry = await vscode.commands.executeCommand<TelemetrySnapshot>("agentPlatform.test.getTelemetrySnapshot");
   assert.equal(telemetry?.totalRuns, 1);
   assert.equal(telemetry?.previewRuns, 1);
   assert.equal(telemetry?.completedRuns, 1);
   assert.equal(telemetry?.providerUsage.copilot, 1);
 
-  await vscode.commands.executeCommand("tokenSaviorAgent.showStoredAgentRun", seededRun.id);
-  await vscode.commands.executeCommand("tokenSaviorAgent.showLastAgentTrace");
+  await vscode.commands.executeCommand("agentPlatform.showStoredAgentRun", seededRun.id);
+  await vscode.commands.executeCommand("agentPlatform.showLastAgentTrace");
 
 
   const activeRun: ActiveRunRecord = {
@@ -141,19 +141,19 @@ export async function runSmokeTests(): Promise<void> {
     startedAt: "2026-04-24T15:05:00.000Z",
     activeFilePath: "src/token_savior/service_api/service.py",
   };
-  await vscode.commands.executeCommand("tokenSaviorAgent.test.seedActiveRun", activeRun);
-  const recovered = await vscode.commands.executeCommand<boolean>("tokenSaviorAgent.test.runRecoveryCheck");
+  await vscode.commands.executeCommand("agentPlatform.test.seedActiveRun", activeRun);
+  const recovered = await vscode.commands.executeCommand<boolean>("agentPlatform.test.runRecoveryCheck");
   assert.equal(recovered, true);
 
-  const clearedActiveRun = await vscode.commands.executeCommand<ActiveRunRecord | undefined>("tokenSaviorAgent.test.getActiveRun");
+  const clearedActiveRun = await vscode.commands.executeCommand<ActiveRunRecord | undefined>("agentPlatform.test.getActiveRun");
   assert.equal(clearedActiveRun, undefined);
 
-  const telemetryAfterRecovery = await vscode.commands.executeCommand<TelemetrySnapshot>("tokenSaviorAgent.test.getTelemetrySnapshot");
+  const telemetryAfterRecovery = await vscode.commands.executeCommand<TelemetrySnapshot>("agentPlatform.test.getTelemetrySnapshot");
   assert.equal(telemetryAfterRecovery?.recoveryEvents, 1);
   assert.match(telemetryAfterRecovery?.lastRecoveryMessage ?? "", /recovery-run-1|Run impacted tests/i);
 
   const deniedEdit = await vscode.commands.executeCommand<SimulatedToolRoutingResult>(
-    "tokenSaviorAgent.test.simulateToolRouting",
+    "agentPlatform.test.simulateToolRouting",
     {
       toolName: "apply_symbol_change_and_validate",
       workspaceTrusted: true,
@@ -166,7 +166,7 @@ export async function runSmokeTests(): Promise<void> {
   assert.match(deniedEdit?.approvalRequest?.reason ?? "", /edit tools/i);
 
   const trustedTest = await vscode.commands.executeCommand<SimulatedToolRoutingResult>(
-    "tokenSaviorAgent.test.simulateToolRouting",
+    "agentPlatform.test.simulateToolRouting",
     {
       toolName: "run_impacted_tests",
       workspaceTrusted: true,
@@ -178,7 +178,7 @@ export async function runSmokeTests(): Promise<void> {
   assert.deepEqual(trustedTest?.completedTools, ["run_impacted_tests"]);
 
   const forcedReadApproval = await vscode.commands.executeCommand<SimulatedToolRoutingResult>(
-    "tokenSaviorAgent.test.simulateToolRouting",
+    "agentPlatform.test.simulateToolRouting",
     {
       toolName: "find_symbol",
       forceApproval: true,
@@ -191,7 +191,7 @@ export async function runSmokeTests(): Promise<void> {
   assert.equal(forcedReadApproval?.invoked, true);
 
   const destructiveDenied = await vscode.commands.executeCommand<SimulatedToolRoutingResult>(
-    "tokenSaviorAgent.test.simulateToolRouting",
+    "agentPlatform.test.simulateToolRouting",
     {
       toolName: "restore_checkpoint",
       workspaceTrusted: true,
@@ -215,7 +215,7 @@ export async function runSmokeTests(): Promise<void> {
     document.lineAt(lastSelectionLine).range.end,
   );
 
-  await vscode.commands.executeCommand("tokenSaviorAgent.test.setToolResponses", [
+  await vscode.commands.executeCommand("agentPlatform.test.setToolResponses", [
     {
       toolName: "memory_session_history",
       response: createMockToolResult("memory_session_history", workspaceRoot, []),
@@ -233,13 +233,13 @@ export async function runSmokeTests(): Promise<void> {
       ),
     },
   ]);
-  await vscode.commands.executeCommand("tokenSaviorAgent.test.enqueueInputBoxResponses", [
+  await vscode.commands.executeCommand("agentPlatform.test.enqueueInputBoxResponses", [
     "Apply the selected text to TokenSaviorService.invoke_tool and validate",
   ]);
-  await vscode.commands.executeCommand("tokenSaviorAgent.test.enqueueWarningMessageResponses", ["Approve"]);
-  await vscode.commands.executeCommand("tokenSaviorAgent.askAgentAction");
+  await vscode.commands.executeCommand("agentPlatform.test.enqueueWarningMessageResponses", ["Approve"]);
+  await vscode.commands.executeCommand("agentPlatform.askAgentAction");
 
-  const runsAfterAction = await vscode.commands.executeCommand<StoredPreviewRun[]>("tokenSaviorAgent.test.listPreviewRuns");
+  const runsAfterAction = await vscode.commands.executeCommand<StoredPreviewRun[]>("agentPlatform.test.listPreviewRuns");
   const actionRun = runsAfterAction?.find((run) => run.result.mode === "action" && run.id !== seededRun.id);
   assert.ok(actionRun, "Expected an action-mode run recorded from the real askAgentAction command flow.");
   assert.equal(actionRun?.outcome, "completed");
@@ -247,7 +247,7 @@ export async function runSmokeTests(): Promise<void> {
   assert.equal(actionRun?.result.plan.kind === "tool" ? actionRun.result.plan.toolName : undefined, "apply_symbol_change_and_validate");
 
   const actionToolInvocations = await vscode.commands.executeCommand<ToolInvocationRecord[]>(
-    "tokenSaviorAgent.test.getToolInvocations",
+    "agentPlatform.test.getToolInvocations",
   );
   const applyInvocation = actionToolInvocations?.find((call) => call.toolName === "apply_symbol_change_and_validate");
   assert.ok(applyInvocation, "Expected the action command flow to invoke apply_symbol_change_and_validate through the backend gateway.");
@@ -255,32 +255,32 @@ export async function runSmokeTests(): Promise<void> {
   assert.equal(applyInvocation?.argumentsPayload.file_path, "README.md");
 
   const lastCheckpoint = await vscode.commands.executeCommand<LastCheckpointRecord | undefined>(
-    "tokenSaviorAgent.test.getLastCheckpoint",
+    "agentPlatform.test.getLastCheckpoint",
   );
   assert.equal(lastCheckpoint?.checkpointId, "ckpt-live-1");
   assert.equal(lastCheckpoint?.filePath, "README.md");
 
-  const telemetryAfterAction = await vscode.commands.executeCommand<TelemetrySnapshot>("tokenSaviorAgent.test.getTelemetrySnapshot");
+  const telemetryAfterAction = await vscode.commands.executeCommand<TelemetrySnapshot>("agentPlatform.test.getTelemetrySnapshot");
   assert.equal(telemetryAfterAction?.totalRuns, 2);
   assert.equal(telemetryAfterAction?.actionRuns, 1);
   assert.equal(telemetryAfterAction?.completedRuns, 2);
 
   await vscode.commands.executeCommand("workbench.action.closeAllEditors");
-  await vscode.commands.executeCommand("tokenSaviorAgent.showObservabilityDashboard", actionRun?.id);
+  await vscode.commands.executeCommand("agentPlatform.showObservabilityDashboard", actionRun?.id);
   assert.ok(extension.isActive, "Expected the Token Savior extension to remain active after the dashboard command.");
 
   const observabilityPanel = await vscode.commands.executeCommand<ObservabilityPanelSnapshot | undefined>(
-    "tokenSaviorAgent.test.getLastObservabilityPanel",
+    "agentPlatform.test.getLastObservabilityPanel",
   );
-  assert.equal(observabilityPanel?.viewType, "tokenSaviorAgent.observability");
+  assert.equal(observabilityPanel?.viewType, "agentPlatform.observability");
   assert.equal(observabilityPanel?.title, "Token Savior Observability");
   assert.match(observabilityPanel?.html ?? "", /Action runs/);
   assert.match(observabilityPanel?.html ?? "", /Apply the selected text to TokenSaviorService\.invoke_tool and validate/);
   assert.match(observabilityPanel?.html ?? "", /ckpt-live-1/);
   assert.match(observabilityPanel?.html ?? "", /Latest checkpoint/);
 
-  await vscode.commands.executeCommand("tokenSaviorAgent.test.clearToolResponses");
-  await vscode.commands.executeCommand("tokenSaviorAgent.test.setToolResponses", [
+  await vscode.commands.executeCommand("agentPlatform.test.clearToolResponses");
+  await vscode.commands.executeCommand("agentPlatform.test.setToolResponses", [
     {
       toolName: "list_checkpoints",
       response: createMockToolResult(
@@ -294,12 +294,12 @@ export async function runSmokeTests(): Promise<void> {
       response: createMockToolResult("restore_checkpoint", workspaceRoot, ["Restored checkpoint ckpt-live-1"]),
     },
   ]);
-  await vscode.commands.executeCommand("tokenSaviorAgent.test.enqueueQuickPickResponses", ["ckpt-live-1"]);
-  await vscode.commands.executeCommand("tokenSaviorAgent.test.enqueueWarningMessageResponses", ["Approve"]);
-  await vscode.commands.executeCommand("tokenSaviorAgent.restoreCheckpoint");
+  await vscode.commands.executeCommand("agentPlatform.test.enqueueQuickPickResponses", ["ckpt-live-1"]);
+  await vscode.commands.executeCommand("agentPlatform.test.enqueueWarningMessageResponses", ["Approve"]);
+  await vscode.commands.executeCommand("agentPlatform.restoreCheckpoint");
 
   const restoreInvocations = await vscode.commands.executeCommand<ToolInvocationRecord[]>(
-    "tokenSaviorAgent.test.getToolInvocations",
+    "agentPlatform.test.getToolInvocations",
   );
   assert.ok(restoreInvocations?.some((call) => call.toolName === "list_checkpoints"), "Expected restoreCheckpoint to list checkpoints before restoring.");
   const restoreInvocation = restoreInvocations?.find((call) => call.toolName === "restore_checkpoint");

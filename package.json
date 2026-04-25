@@ -52,134 +52,134 @@
   "contributes": {
     "commands": [
       {
-        "command": "tokenSaviorAgent.pingBackend",
+        "command": "agentPlatform.pingBackend",
         "title": "Agent-Platform: Ping Backend",
         "category": "Agent-Platform"
       },
       {
-        "command": "tokenSaviorAgent.restartBackend",
+        "command": "agentPlatform.restartBackend",
         "title": "Agent-Platform: Restart Backend",
         "category": "Agent-Platform"
       },
       {
-        "command": "tokenSaviorAgent.projectSummary",
+        "command": "agentPlatform.projectSummary",
         "title": "Agent-Platform: Project Summary",
         "category": "Agent-Platform"
       },
       {
-        "command": "tokenSaviorAgent.analyzeCurrentSymbol",
+        "command": "agentPlatform.analyzeCurrentSymbol",
         "title": "Agent-Platform: Analyze Current Symbol",
         "category": "Agent-Platform"
       },
       {
-        "command": "tokenSaviorAgent.findSymbol",
+        "command": "agentPlatform.findSymbol",
         "title": "Agent-Platform: Find Symbol",
         "category": "Agent-Platform"
       },
       {
-        "command": "tokenSaviorAgent.showDependencies",
+        "command": "agentPlatform.showDependencies",
         "title": "Agent-Platform: Show Dependencies",
         "category": "Agent-Platform"
       },
       {
-        "command": "tokenSaviorAgent.showChangeImpact",
+        "command": "agentPlatform.showChangeImpact",
         "title": "Agent-Platform: Show Change Impact",
         "category": "Agent-Platform"
       },
       {
-        "command": "tokenSaviorAgent.searchMemory",
+        "command": "agentPlatform.searchMemory",
         "title": "Agent-Platform: Search Project Memory",
         "category": "Agent-Platform"
       },
       {
-        "command": "tokenSaviorAgent.reindexWorkspace",
+        "command": "agentPlatform.reindexWorkspace",
         "title": "Agent-Platform: Reindex Workspace",
         "category": "Agent-Platform"
       },
       {
-        "command": "tokenSaviorAgent.discoverProjectActions",
+        "command": "agentPlatform.discoverProjectActions",
         "title": "Agent-Platform: Discover Project Actions",
         "category": "Agent-Platform"
       },
       {
-        "command": "tokenSaviorAgent.runProjectAction",
+        "command": "agentPlatform.runProjectAction",
         "title": "Agent-Platform: Run Project Action",
         "category": "Agent-Platform"
       },
       {
-        "command": "tokenSaviorAgent.runImpactedTests",
+        "command": "agentPlatform.runImpactedTests",
         "title": "Agent-Platform: Run Impacted Tests",
         "category": "Agent-Platform"
       },
       {
-        "command": "tokenSaviorAgent.applySelectedTextToSymbol",
+        "command": "agentPlatform.applySelectedTextToSymbol",
         "title": "Agent-Platform: Apply Selected Text to Symbol",
         "category": "Agent-Platform"
       },
       {
-        "command": "tokenSaviorAgent.listCheckpoints",
+        "command": "agentPlatform.listCheckpoints",
         "title": "Agent-Platform: List Checkpoints",
         "category": "Agent-Platform"
       },
       {
-        "command": "tokenSaviorAgent.restoreCheckpoint",
+        "command": "agentPlatform.restoreCheckpoint",
         "title": "Agent-Platform: Restore Checkpoint",
         "category": "Agent-Platform"
       },
       {
-        "command": "tokenSaviorAgent.restoreLastCheckpoint",
+        "command": "agentPlatform.restoreLastCheckpoint",
         "title": "Agent-Platform: Restore Last Checkpoint",
         "category": "Agent-Platform"
       },
       {
-        "command": "tokenSaviorAgent.showProviderStatus",
+        "command": "agentPlatform.showProviderStatus",
         "title": "Agent-Platform: Show Provider Status",
         "category": "Agent-Platform"
       },
       {
-        "command": "tokenSaviorAgent.showObservabilityDashboard",
+        "command": "agentPlatform.showObservabilityDashboard",
         "title": "Agent-Platform: Show Observability Dashboard",
         "category": "Agent-Platform"
       },
       {
-        "command": "tokenSaviorAgent.askAgentPreview",
+        "command": "agentPlatform.askAgentPreview",
         "title": "Agent-Platform: Ask Agent (Preview)",
         "category": "Agent-Platform"
       },
       {
-        "command": "tokenSaviorAgent.askAgentAction",
+        "command": "agentPlatform.askAgentAction",
         "title": "Agent-Platform: Ask Agent (Action Mode)",
         "category": "Agent-Platform"
       },
       {
-        "command": "tokenSaviorAgent.showLastAgentTrace",
+        "command": "agentPlatform.showLastAgentTrace",
         "title": "Agent-Platform: Show Last Agent Trace",
         "category": "Agent-Platform"
       },
       {
-        "command": "tokenSaviorAgent.showAgentRunHistory",
+        "command": "agentPlatform.showAgentRunHistory",
         "title": "Agent-Platform: Show Agent Run History",
         "category": "Agent-Platform"
       },
       {
-        "command": "tokenSaviorAgent.clearAgentRunHistory",
+        "command": "agentPlatform.clearAgentRunHistory",
         "title": "Agent-Platform: Clear Agent Run History",
         "category": "Agent-Platform"
       },
       {
-        "command": "tokenSaviorAgent.saveLastRunToMemory",
+        "command": "agentPlatform.saveLastRunToMemory",
         "title": "Agent-Platform: Save Last Run to Memory",
         "category": "Agent-Platform"
       },
       {
-        "command": "tokenSaviorAgent.promoteProjectMemory",
+        "command": "agentPlatform.promoteProjectMemory",
         "title": "Agent-Platform: Promote Project Memory",
         "category": "Agent-Platform"
       }
     ],
     "chatParticipants": [
       {
-        "id": "tokenSaviorAgent.assistant",
+        "id": "agentPlatform.assistant",
         "name": "token-savior",
         "fullName": "Agent-Platform",
         "description": "Dynamic agent platform — generic tool providers, adaptive planning, memory abstraction, and safe code mutations.",
@@ -211,7 +211,7 @@
     "views": {
       "explorer": [
         {
-          "id": "tokenSaviorAgent.runHistory",
+          "id": "agentPlatform.runHistory",
           "name": "Agent-Platform Runs"
         }
       ]
@@ -219,18 +219,18 @@
     "menus": {
       "view/title": [
         {
-          "command": "tokenSaviorAgent.showObservabilityDashboard",
-          "when": "view == tokenSaviorAgent.runHistory",
+          "command": "agentPlatform.showObservabilityDashboard",
+          "when": "view == agentPlatform.runHistory",
           "group": "navigation@0"
         },
         {
-          "command": "tokenSaviorAgent.showLastAgentTrace",
-          "when": "view == tokenSaviorAgent.runHistory",
+          "command": "agentPlatform.showLastAgentTrace",
+          "when": "view == agentPlatform.runHistory",
           "group": "navigation@1"
         },
         {
-          "command": "tokenSaviorAgent.clearAgentRunHistory",
-          "when": "view == tokenSaviorAgent.runHistory",
+          "command": "agentPlatform.clearAgentRunHistory",
+          "when": "view == agentPlatform.runHistory",
           "group": "navigation@2"
         }
       ]
@@ -238,22 +238,22 @@
     "configuration": {
       "title": "Agent-Platform",
       "properties": {
-        "tokenSaviorAgent.pythonPath": {
+        "agentPlatform.pythonPath": {
           "type": "string",
           "default": "",
           "description": "Optional absolute path to the Python executable used to launch the Agent-Platform backend."
         },
-        "tokenSaviorAgent.backend.enabled": {
+        "agentPlatform.backend.enabled": {
           "type": "boolean",
           "default": true,
           "description": "Enable the Agent-Platform Python backend tool provider. Set to false to run the agent without any tool provider (direct-answer mode only)."
         },
-        "tokenSaviorAgent.serviceModule": {
+        "agentPlatform.serviceModule": {
           "type": "string",
           "default": "token_savior.service_api.server",
           "description": "Python module path for the Token Savior internal service transport."
         },
-        "tokenSaviorAgent.modelProvider": {
+        "agentPlatform.modelProvider": {
           "type": "string",
           "enum": [
             "copilot",
@@ -262,32 +262,32 @@
           "default": "copilot",
           "description": "Preferred model provider for future Token Savior orchestration."
         },
-        "tokenSaviorAgent.copilotModelFamily": {
+        "agentPlatform.copilotModelFamily": {
           "type": "string",
           "default": "",
           "description": "Optional VS Code language model family selector for the Copilot-backed provider."
         },
-        "tokenSaviorAgent.copilotModelId": {
+        "agentPlatform.copilotModelId": {
           "type": "string",
           "default": "",
           "description": "Optional exact VS Code language model id for the Copilot-backed provider."
         },
-        "tokenSaviorAgent.localModelLabel": {
+        "agentPlatform.localModelLabel": {
           "type": "string",
           "default": "Local Model",
           "description": "Display label for the configured local model provider."
         },
-        "tokenSaviorAgent.localEndpoint": {
+        "agentPlatform.localEndpoint": {
           "type": "string",
           "default": "http://127.0.0.1:11434",
           "description": "Base URL of the local model runtime (for Ollama or an OpenAI-compatible server)."
         },
-        "tokenSaviorAgent.localModelName": {
+        "agentPlatform.localModelName": {
           "type": "string",
           "default": "",
           "description": "Model name served by the local runtime, for example llama3.1:8b or mistral."
         },
-        "tokenSaviorAgent.localApiFormat": {
+        "agentPlatform.localApiFormat": {
           "type": "string",
           "enum": [
             "ollama",
@@ -296,12 +296,12 @@
           "default": "ollama",
           "description": "Protocol used by the local model runtime."
         },
-        "tokenSaviorAgent.localApiKey": {
+        "agentPlatform.localApiKey": {
           "type": "string",
           "default": "",
           "description": "Optional API key for an OpenAI-compatible local model endpoint."
         },
-        "tokenSaviorAgent.editApprovalMode": {
+        "agentPlatform.editApprovalMode": {
           "type": "string",
           "enum": [
             "ask",
@@ -310,7 +310,7 @@
           "default": "ask",
           "description": "Approval policy for edit tools."
         },
-        "tokenSaviorAgent.testApprovalMode": {
+        "agentPlatform.testApprovalMode": {
           "type": "string",
           "enum": [
             "ask",
@@ -320,7 +320,7 @@
           "default": "allow-trusted",
           "description": "Approval policy for test tools."
         },
-        "tokenSaviorAgent.commandApprovalMode": {
+        "agentPlatform.commandApprovalMode": {
           "type": "string",
           "enum": [
             "ask",
@@ -330,7 +330,7 @@
           "default": "allow-trusted",
           "description": "Approval policy for project action commands."
         },
-        "tokenSaviorAgent.destructiveApprovalMode": {
+        "agentPlatform.destructiveApprovalMode": {
           "type": "string",
           "enum": [
             "ask",
@@ -339,23 +339,23 @@
           "default": "ask",
           "description": "Approval policy for destructive tools like checkpoint restore."
         },
-        "tokenSaviorAgent.autoSaveProjectMemory": {
+        "agentPlatform.autoSaveProjectMemory": {
           "type": "boolean",
           "default": false,
           "description": "Automatically save approved mutating workflow outcomes and eligible tool-backed preview runs to project memory."
         },
-        "tokenSaviorAgent.persistRunHistory": {
+        "agentPlatform.persistRunHistory": {
           "type": "boolean",
           "default": true,
           "description": "Persist recent preview runs in workspace state so they survive extension-host restarts."
         },
-        "tokenSaviorAgent.toolTimeoutMs": {
+        "agentPlatform.toolTimeoutMs": {
           "type": "number",
           "default": 30000,
           "minimum": 1000,
           "description": "Per-tool-call timeout in milliseconds. Calls exceeding this are failed gracefully."
         },
-        "tokenSaviorAgent.maxContextTokens": {
+        "agentPlatform.maxContextTokens": {
           "type": "number",
           "default": 8000,
           "minimum": 1000,

@@ -29,14 +29,14 @@ export class LocalModelProvider implements ModelProvider {
     if (!this.endpoint) {
       return {
         status: "unavailable",
-        reason: "Set tokenSaviorAgent.localEndpoint to enable a local model runtime.",
+        reason: "Set agentPlatform.localEndpoint to enable a local model runtime.",
       };
     }
 
     if (!this.options.modelName) {
       return {
         status: "unavailable",
-        reason: "Set tokenSaviorAgent.localModelName to select the local model to use.",
+        reason: "Set agentPlatform.localModelName to select the local model to use.",
       };
     }
 
@@ -94,7 +94,7 @@ export class LocalModelProvider implements ModelProvider {
 
   public async complete(request: ProviderCompletionRequest): Promise<ProviderCompletionResponse> {
     if (!this.endpoint || !this.options.modelName) {
-      throw new Error("Local model runtime is not configured. Set tokenSaviorAgent.localEndpoint and localModelName.");
+      throw new Error("Local model runtime is not configured. Set agentPlatform.localEndpoint and localModelName.");
     }
 
     const response = await fetch(

@@ -126,12 +126,12 @@ export function registerChatParticipant(
         env.outputChannel.appendLine(`Token Savior auto-save warning: ${recorded.memoryStatus.reason}`);
       }
       stream.button({
-        command: "tokenSaviorAgent.showStoredAgentRun",
+        command: "agentPlatform.showStoredAgentRun",
         title: "Open run details",
         arguments: [recorded.run.id],
       });
       stream.button({
-        command: "tokenSaviorAgent.showLastAgentTrace",
+        command: "agentPlatform.showLastAgentTrace",
         title: "Show trace",
       });
       if (outcome === "failed") {
@@ -174,7 +174,7 @@ export function registerChatParticipant(
     }
   };
 
-  const participant = vscode.chat.createChatParticipant("tokenSaviorAgent.assistant", handler);
+  const participant = vscode.chat.createChatParticipant("agentPlatform.assistant", handler);
   participant.iconPath = new vscode.ThemeIcon("hubot");
   return participant;
 }

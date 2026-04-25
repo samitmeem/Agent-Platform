@@ -26,7 +26,7 @@ export function getPrimaryWorkspaceRoot(): string | undefined {
 }
 
 export function loadModelProviderSettings(): ModelProviderSettings {
-  const config = vscode.workspace.getConfiguration("tokenSaviorAgent");
+  const config = vscode.workspace.getConfiguration("agentPlatform");
   const preferredProvider = config.get<string>("modelProvider") === "local"
     ? "local"
     : "copilot";
@@ -53,7 +53,7 @@ export function loadModelProviderSettings(): ModelProviderSettings {
 }
 
 export function loadApprovalSettings(): ApprovalSettings {
-  const config = vscode.workspace.getConfiguration("tokenSaviorAgent");
+  const config = vscode.workspace.getConfiguration("agentPlatform");
   return {
     editMode: normalizeApprovalMode(config.get<string>("editApprovalMode"), "ask"),
     testMode: normalizeApprovalMode(config.get<string>("testApprovalMode"), "allow-trusted"),
@@ -67,5 +67,5 @@ export function loadApprovalSettings(): ApprovalSettings {
 export function isTokenSaviorConfigurationChange(
   event: vscode.ConfigurationChangeEvent,
 ): boolean {
-  return event.affectsConfiguration("tokenSaviorAgent");
+  return event.affectsConfiguration("agentPlatform");
 }

@@ -15,7 +15,7 @@ export function showObservabilityPanel(
   onDidRender?: (snapshot: ObservabilityPanelSnapshot) => void,
 ): void {
   const panel = vscode.window.createWebviewPanel(
-    "tokenSaviorAgent.observability",
+    "agentPlatform.observability",
     "Token Savior Observability",
     vscode.ViewColumn.Beside,
     {
@@ -26,7 +26,7 @@ export function showObservabilityPanel(
 
   panel.webview.html = buildObservabilityHtml(sessionStore, telemetry, runId, lastCheckpoint);
   onDidRender?.({
-    viewType: "tokenSaviorAgent.observability",
+    viewType: "agentPlatform.observability",
     title: panel.title,
     html: panel.webview.html,
     visible: panel.visible,

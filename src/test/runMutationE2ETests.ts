@@ -35,7 +35,7 @@ function prepareMutationWorkspace(extensionDevelopmentPath: string): { workspace
   const currentSettings = JSON.parse(readFileSync(settingsPath, "utf-8")) as Record<string, unknown>;
   const preferredPython = detectPreferredPython(repoRoot);
   if (preferredPython) {
-    currentSettings["tokenSaviorAgent.pythonPath"] = preferredPython;
+    currentSettings["agentPlatform.pythonPath"] = preferredPython;
   }
   writeFileSync(settingsPath, `${JSON.stringify(currentSettings, null, 2)}\n`, "utf-8");
 

@@ -61,7 +61,7 @@ implements vscode.TreeDataProvider<RunHistoryTreeNode>, vscode.Disposable {
         treeItem.tooltip = formatStoredPreviewRunBody(element.run);
         treeItem.contextValue = "previewRun";
         treeItem.command = {
-          command: "tokenSaviorAgent.showStoredAgentRun",
+          command: "agentPlatform.showStoredAgentRun",
           title: "Show Agent Run",
           arguments: [element.run.id],
         };
@@ -81,7 +81,7 @@ implements vscode.TreeDataProvider<RunHistoryTreeNode>, vscode.Disposable {
           : element.entry.message;
         treeItem.contextValue = "previewRunTrace";
         treeItem.command = {
-          command: "tokenSaviorAgent.showStoredAgentRun",
+          command: "agentPlatform.showStoredAgentRun",
           title: "Show Agent Run",
           arguments: [element.run.id],
         };
