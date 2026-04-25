@@ -1,6 +1,6 @@
 {
-  "name": "token-savior-agent",
-  "displayName": "Token Savior Agent",
+  "name": "agent-platform",
+  "displayName": "Agent-Platform",
   "description": "Backend-powered project intelligence, safe mutation workflows, checkpoints, and observability for Token Savior in VS Code.",
   "version": "0.1.0",
   "publisher": "samitmeem",

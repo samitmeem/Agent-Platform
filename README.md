@@ -1,4 +1,4 @@
-# Token Savior Agent — VS Code Extension
+# Agent-Platform — VS Code Extension
 
 A VS Code extension that connects to the MCPs
 Python backend to provide project-wide code intelligence, safe mutation workflows,
@@ -45,7 +45,7 @@ uv add token-savior
 
 ## Quick Start
 
-1. Install the extension from the VS Code Marketplace (search *Token Savior Agent*)
+1. Install the extension from the VS Code Marketplace (search *Agent-Platform*)
    or install the `.vsix` manually via **Extensions: Install from VSIX...**
 2. Open a project folder that has the token-savior backend installed.
 3. The extension auto-starts the backend. Status appears in the bottom-left status bar.
