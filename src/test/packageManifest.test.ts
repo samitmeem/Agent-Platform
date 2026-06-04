@@ -137,6 +137,7 @@ test("extension release workflow packages before publishing", () => {
 
   assert.match(workflow, /actions\/checkout@v4/);
   assert.match(workflow, /actions\/setup-node@v4/);
+  assert.match(workflow, /tags:\s*\[ext-v\*\]/);
   assert.match(workflow, /npm ci/);
   assert.match(workflow, /npm run compile/);
   assert.match(workflow, /npm test/);

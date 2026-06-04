@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: [ext-v*]
   pull_request:
     branches: [main]
 

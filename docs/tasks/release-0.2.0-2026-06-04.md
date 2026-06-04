@@ -16,6 +16,7 @@ Completed work:
 - synchronized the lockfile root package identity and version to `agent-platform@0.2.0`
 - updated shipped usage documentation to reference `0.2.0`
 - refreshed the project overview doc so it points at the current repository, publisher, and chat participant identity
+- fixed the GitHub Actions trigger so release tags matching `ext-v*` actually start the publish workflow
 - prepared the repository for tag-triggered GitHub Marketplace/Open VSX publishing via `ext-v0.2.0`
 
 ---
@@ -26,6 +27,8 @@ Completed work:
 - `package-lock.json`
 - `docs/AGENT_PLATFORM_USAGE.md`
 - `docs/project-overview.md`
+- `.github/workflows/ci.yml`
+- `src/test/packageManifest.test.ts`
 - `docs/tasks/release-0.2.0-2026-06-04.md`
 
 ---
