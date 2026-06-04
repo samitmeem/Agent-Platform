@@ -644,8 +644,8 @@
     "@types/node": "^22.15.31",
     "@types/vscode": "^1.99.0",
     "@vscode/test-electron": "^2.5.2",
-    "@vscode/vsce": "^3.9.1",
-    "ovsx": "^0.10.11",
+    "@vscode/vsce": "^3.9.2",
+    "ovsx": "^0.10.12",
     "typescript": "^5.8.3"
   }
 }
