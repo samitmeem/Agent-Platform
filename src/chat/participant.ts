@@ -10,6 +10,7 @@ import {
 import type { ToolProviderRegistry } from "../tools/providerRegistry";
 import type { MemoryCapability } from "../tools/interface";
 import type { ApprovalSettings } from "../policies/approvalPolicy";
+import type { AutomationSettings } from "../config";
 import { ModelProviderRegistry } from "../providers/registry";
 import { SessionStore } from "../state/sessionStore";
 import { type TelemetryState } from "../state/telemetryState";
@@ -25,8 +26,8 @@ export interface ChatParticipantEnvironment {
   toolProviderRegistry: ToolProviderRegistry;
   /** Optional direct gateway reference — used only for health reads from the token-savior adapter. */
   gateway?: import("../adapters/tokenSavior/gateway").BackendGateway;
-  /** Memory capability resolved from the active tool provider — passed to AgentRuntime. */
-  memoryCapability?: MemoryCapability;
+  /** Live resolver for the memory capability — called at run time, not activation time. */
+  resolveMemoryCapability?: () => MemoryCapability | undefined;
   statusBar: BackendStatusBarController;
   outputChannel: vscode.OutputChannel;
   getWorkspaceRoot(): string | undefined;
@@ -35,6 +36,7 @@ export interface ChatParticipantEnvironment {
   getApprovalSettings(): ApprovalSettings;
   getWorkspaceStore(): WorkspaceStore;
   getTelemetryState(): TelemetryState;
+  resolveAutomationSettings?: () => AutomationSettings;
 }
 
 function getSelectedText(): string | undefined {
@@ -58,8 +60,8 @@ export function registerChatParticipant(
   const handler: vscode.ChatRequestHandler = async (request, _chatContext, stream, token) => {
     const workspaceRoot = env.getWorkspaceRoot();
     if (!workspaceRoot) {
-      stream.markdown("Open a workspace folder before using Token Savior chat.");
-      env.statusBar.setIdle("Open a workspace folder to use Token Savior chat.");
+      stream.markdown("Open a workspace folder before using Agent-Platform chat.");
+      env.statusBar.setIdle("Open a workspace folder to use Agent-Platform chat.");
       return;
     }
 
@@ -70,7 +72,7 @@ export function registerChatParticipant(
       return;
     }
 
-    env.statusBar.setStarting("Running Token Savior chat…");
+    env.statusBar.setStarting("Running Agent-Platform chat…");
     const runId = `chat-${Date.now()}`;
     const startedAt = new Date().toISOString();
     const startedMs = Date.now();
@@ -88,7 +90,15 @@ export function registerChatParticipant(
         providerRegistry: env.getProviderRegistry(),
         sessionStore: env.getSessionStore(),
         listTools: () => env.toolProviderRegistry.listAllTools(),
-        memoryCapability: env.memoryCapability,
+        resolveMemoryCapability: env.resolveMemoryCapability,
+        resolveAutomationSettings: env.resolveAutomationSettings,
+        resolveWorkspaceProfile: () => env.getWorkspaceStore().getWorkspaceProfile(),
+        resolveWorkspacePhase: () => env.getWorkspaceStore().getWorkspacePhase(),
+        resolveWorkspaceRefreshState: () => env.getWorkspaceStore().getWorkspaceRefreshState(),
+        resolveWorkspaceProjectMode: () => env.getWorkspaceStore().getWorkspaceProjectMode(),
+        resolveWorkspaceProjectMemory: () => env.getWorkspaceStore().getWorkspaceProjectMemory(),
+        resolveWorkspaceSuggestions: () => env.getWorkspaceStore().getWorkspaceSuggestions(),
+        resolveWorkspaceProjectMemorySummary: () => env.getWorkspaceStore().getWorkspaceProjectMemory()?.summary,
         toolExecutor: {
           invokeTool: (root, name, argumentsPayload) => env.toolProviderRegistry.routeTool(name, argumentsPayload, root),
         },
@@ -98,6 +108,14 @@ export function registerChatParticipant(
         selectedText,
         activeFilePath: getActiveFilePath(),
         cancellationSignal: token,
+        // Task 3: emit lightweight progress messages so the chat panel is not blank during long runs.
+        onProgress: (event) => {
+          if (event.kind === "tool_start") {
+            stream.markdown(`_Running \`${event.toolName}\`…_\n\n`);
+          } else if (event.kind === "summarizing") {
+            stream.markdown(`_Summarizing results…_\n\n`);
+          }
+        },
       });
       const outcome = deriveRunOutcome(result);
 
@@ -123,7 +141,7 @@ export function registerChatParticipant(
       if (recorded.memoryStatus.state === "saved") {
         stream.markdown(`_Saved this run to project memory automatically._`);
       } else if (recorded.memoryStatus.state === "failed") {
-        env.outputChannel.appendLine(`Token Savior auto-save warning: ${recorded.memoryStatus.reason}`);
+        env.outputChannel.appendLine(`Agent-Platform auto-save warning: ${recorded.memoryStatus.reason}`);
       }
       stream.button({
         command: "agentPlatform.showStoredAgentRun",
@@ -135,13 +153,13 @@ export function registerChatParticipant(
         title: "Show trace",
       });
       if (outcome === "failed") {
-        const failureMessage = deriveRunFailureMessage(recorded.run.result) ?? "Token Savior chat returned a failed backend tool result.";
+        const failureMessage = deriveRunFailureMessage(recorded.run.result) ?? "Agent-Platform chat returned a failed backend tool result.";
         stream.markdown(`\n\n_Failed tool result: ${failureMessage}_`);
         env.statusBar.setError(failureMessage);
         return;
       }
 
-      env.statusBar.setReady(env.gateway?.getLastHealth(), "Token Savior chat complete.");
+      env.statusBar.setReady(env.gateway?.getLastHealth(), "Agent-Platform chat complete.");
     } catch (error) {
       if (error instanceof AgentRuntimeCancelledError) {
         await env.getTelemetryState().recordRunEvent({
@@ -153,7 +171,7 @@ export function registerChatParticipant(
           finishedAt: new Date().toISOString(),
         });
         await env.getWorkspaceStore().clearActiveRun();
-        stream.markdown("Token Savior chat request was cancelled.");
+        stream.markdown("Agent-Platform chat request was cancelled.");
         env.statusBar.setIdle("Chat request cancelled.");
         return;
       }
@@ -169,7 +187,7 @@ export function registerChatParticipant(
         errorMessage: message,
       });
       await env.getWorkspaceStore().clearActiveRun();
-      stream.markdown(`Token Savior failed: ${message}`);
+      stream.markdown(`Agent-Platform failed: ${message}`);
       env.statusBar.setError(message);
     }
   };

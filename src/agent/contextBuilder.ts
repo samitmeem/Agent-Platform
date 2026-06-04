@@ -1,9 +1,12 @@
 import type { AgentMemoryContext } from "./memoryBridge";
+import { budgetContextBlock, budgetSelectedText } from "./contextBudget";
 
 export interface AgentContextBuildInput {
   selectedText?: string;
   activeFilePath?: string;
+  workspaceContextBundle?: string;
   memoryContext?: AgentMemoryContext;
+  maxContextChars?: number;
 }
 
 export function buildAgentContext(input: AgentContextBuildInput): string | undefined {
@@ -13,11 +16,14 @@ export function buildAgentContext(input: AgentContextBuildInput): string | undef
     sections.push(`Active file: ${input.activeFilePath}`);
   }
 
-  if (input.selectedText?.trim()) {
-    sections.push(["Selected text:", input.selectedText.trim()].join("\n"));
+  const selectedText = budgetSelectedText(input.selectedText);
+  if (selectedText) {
+    sections.push(["Selected text:", selectedText].join("\n"));
   }
 
-  if (input.memoryContext?.recentRuns.length) {
+  if (input.workspaceContextBundle?.trim()) {
+    sections.push(input.workspaceContextBundle.trim());
+  } else if (input.memoryContext?.recentRuns.length) {
     sections.push([
       "Recent preview runs:",
       ...input.memoryContext.recentRuns.map((line) => `- ${line}`),
@@ -28,6 +34,10 @@ export function buildAgentContext(input: AgentContextBuildInput): string | undef
     sections.push(["Prior session history:", input.memoryContext.sessionHistory].join("\n"));
   }
 
+  if (!input.workspaceContextBundle?.trim() && input.memoryContext?.workspaceMemory) {
+    sections.push(["Workspace memory summary:", input.memoryContext.workspaceMemory].join("\n"));
+  }
+
   if (input.memoryContext?.projectMemory) {
     sections.push(["Relevant project memory:", input.memoryContext.projectMemory].join("\n"));
   }
@@ -36,5 +46,5 @@ export function buildAgentContext(input: AgentContextBuildInput): string | undef
     return undefined;
   }
 
-  return sections.join("\n\n");
+  return budgetContextBlock(sections.join("\n\n"), input.maxContextChars);
 }

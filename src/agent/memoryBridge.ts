@@ -15,11 +15,14 @@ export interface AgentMemoryBridgeDependencies {
   sessionStore: SessionStore;
   /** Provided by the registered tool provider; omit to disable memory tool calls. */
   memoryCapability?: MemoryCapability;
+  /** Extension-owned compact project memory summary for backend-optional context injection. */
+  workspaceMemorySummary?: string;
 }
 
 export interface AgentMemoryContext {
   recentRuns: string[];
   sessionHistory?: string;
+  workspaceMemory?: string;
   projectMemory?: string;
 }
 
@@ -52,6 +55,7 @@ export class AgentMemoryBridge {
       .map((run) => `${toCompactSingleLine(run.query, 90)} => ${toCompactSingleLine(run.answer, 120)}`);
 
     const capability = this.dependencies.memoryCapability;
+    const workspaceMemory = this.extractInlineText(this.dependencies.workspaceMemorySummary, 1_200);
     const sessionHistoryResult = capability
       ? await this.tryInvokeTool(capability.sessionHistoryToolName, { limit: 2 })
       : undefined;
@@ -62,6 +66,7 @@ export class AgentMemoryBridge {
     return {
       recentRuns,
       sessionHistory: this.extractContextText(sessionHistoryResult, 800),
+      workspaceMemory,
       projectMemory: this.extractContextText(projectMemoryResult, 1000),
     };
   }
@@ -95,5 +100,14 @@ export class AgentMemoryBridge {
     }
 
     return text.length <= maxLength ? text : `${text.slice(0, maxLength - 1)}…`;
+  }
+
+  private extractInlineText(text: string | undefined, maxLength: number): string | undefined {
+    const normalized = text?.trim();
+    if (!normalized) {
+      return undefined;
+    }
+
+    return normalized.length <= maxLength ? normalized : `${normalized.slice(0, maxLength - 1)}…`;
   }
 }

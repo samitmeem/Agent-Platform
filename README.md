@@ -169,7 +169,9 @@ These 8 tests prove dynamic tool discovery, no-tools mode, multi-tool reasoning,
 
 ```powershell
 $env:VSCE_PAT = "your-pat-here"
+$env:OVSX_PAT = "your-pat-here"
 npm run package        # builds .vsix in .artifacts/
+npm run publish:dry-run # validates the packaged artifact path without publishing
 npm run publish:vsce   # publishes to the VS Code Marketplace
 npm run publish:ovsx   # publishes to Open VSX (optional)
 ```

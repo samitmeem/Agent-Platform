@@ -16,7 +16,7 @@ function detectPreferredPython(repoRoot: string): string | undefined {
 }
 
 function prepareMutationWorkspace(extensionDevelopmentPath: string): { workspacePath: string; userDataDir: string } {
-  const repoRoot = resolve(extensionDevelopmentPath, "..");
+  const repoRoot = extensionDevelopmentPath;
   const fixtureRoot = resolve(extensionDevelopmentPath, "src", "test", "fixtures", "mutation-workspace");
   const scratchParent = resolve(extensionDevelopmentPath, ".tmp");
   const workspacePath = join(scratchParent, `mutation-e2e-${Date.now()}`);
@@ -26,8 +26,8 @@ function prepareMutationWorkspace(extensionDevelopmentPath: string): { workspace
   cpSync(fixtureRoot, workspacePath, { recursive: true });
   mkdirSync(userDataDir, { recursive: true });
 
-  const repoSrc = join(repoRoot, "src");
-  process.env.PYTHONPATH = [repoSrc, process.env.PYTHONPATH ?? ""]
+  const workspaceSrc = join(workspacePath, "src");
+  process.env.PYTHONPATH = [workspaceSrc, process.env.PYTHONPATH ?? ""]
     .filter((part) => part.length > 0)
     .join(pathSeparator());
 
@@ -55,6 +55,6 @@ async function main(): Promise<void> {
 }
 
 void main().catch((error) => {
-  console.error("Failed to run Token Savior mutation E2E tests.", error);
+  console.error("Failed to run Agent-Platform mutation E2E tests.", error);
   process.exit(1);
 });

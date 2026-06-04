@@ -127,7 +127,7 @@ test("recordPreviewRun auto-saves eligible runs to project memory", async () => 
 
   const result = await recordPreviewRun({
     toolProviderRegistry: {
-      routeTool: async (_workspaceRoot: string, toolName: string, args: Record<string, unknown>) => {
+      routeTool: async (toolName: string, args: Record<string, unknown>, _workspaceRoot: string) => {
         calls.push({ toolName, args });
         return { name: toolName, ok: true, content: ["saved"] };
       },

@@ -25,10 +25,10 @@ export function budgetSelectedText(text: string | undefined): string | undefined
   return truncate(text.trim(), SELECTED_TEXT_MAX_CHARS, "selected text");
 }
 
-export function budgetToolResult(text: string): string {
-  return truncate(text, TOOL_RESULT_MAX_CHARS, "tool result");
+export function budgetToolResult(text: string, maxChars = TOOL_RESULT_MAX_CHARS): string {
+  return truncate(text, maxChars, "tool result");
 }
 
-export function budgetContextBlock(text: string): string {
-  return truncate(text, CONTEXT_BLOCK_MAX_CHARS, "context");
+export function budgetContextBlock(text: string, maxChars = CONTEXT_BLOCK_MAX_CHARS): string {
+  return truncate(text, maxChars, "context");
 }

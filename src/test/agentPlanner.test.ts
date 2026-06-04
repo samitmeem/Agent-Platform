@@ -169,6 +169,39 @@ test("AgentPlanner creates a follow-up dependency step heuristically", async () 
   assert.equal(plan?.arguments.name, "TokenSaviorService");
 });
 
+test("AgentPlanner creates a validation follow-up after a successful apply action", async () => {
+  const planner = new AgentPlanner();
+
+  const plan = await planner.planFollowUp({
+    query: "Apply the selected text to TokenSaviorService.invoke_tool and validate it",
+    selectedText: "def invoke_tool(self, name: str) -> str:\n    return name",
+    mode: "action",
+    activeFilePath: "src/token_savior/service_api/service.py",
+    previousPlans: [
+      {
+        kind: "tool",
+        toolName: "apply_symbol_change_and_validate",
+        arguments: {
+          symbol_name: "TokenSaviorService.invoke_tool",
+        },
+        reasoning: "Apply the requested change first.",
+        source: "heuristic",
+      },
+    ],
+    previousToolResults: [
+      {
+        name: "apply_symbol_change_and_validate",
+        ok: true,
+        content: [JSON.stringify({ checkpoint_id: "ckpt-1", validated: true })],
+      },
+    ],
+  });
+
+  assert.equal(plan?.kind, "tool");
+  assert.equal(plan?.toolName, "run_impacted_tests");
+  assert.deepEqual(plan?.arguments.symbol_names, ["TokenSaviorService.invoke_tool"]);
+});
+
 test("AgentPlanner accepts model action plans in action mode", async () => {
   const planner = new AgentPlanner();
   const provider = new FakeProvider('{"mode":"tool","toolName":"run_impacted_tests","arguments":{"symbol_names":["TokenSaviorService"]},"reasoning":"Validate the changed symbol."}');

@@ -8,10 +8,10 @@ import {
 } from "../ui/statusPresentation";
 
 test("getStatusBarText reflects backend state", () => {
-  assert.equal(getStatusBarText({ kind: "idle" }), "$(circle-slash) Token Savior");
-  assert.equal(getStatusBarText({ kind: "starting" }), "$(sync~spin) Token Savior");
-  assert.equal(getStatusBarText({ kind: "ready" }), "$(check) Token Savior");
-  assert.equal(getStatusBarText({ kind: "error" }), "$(error) Token Savior");
+  assert.equal(getStatusBarText({ kind: "idle" }), "$(circle-slash) Agent-Platform");
+  assert.equal(getStatusBarText({ kind: "starting" }), "$(sync~spin) Agent-Platform");
+  assert.equal(getStatusBarText({ kind: "ready" }), "$(check) Agent-Platform");
+  assert.equal(getStatusBarText({ kind: "error" }), "$(error) Agent-Platform");
 });
 
 test("getStatusBarTooltip includes health details when ready", () => {

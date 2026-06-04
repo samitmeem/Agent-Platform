@@ -211,3 +211,48 @@ test("AgentRuntime can execute a bounded action-mode tool call", async () => {
   assert.match(result.answer, /2 impacted tests passed/i);
   assert.equal(result.trace[0]?.phase, "control");
 });
+
+test("AgentRuntime can continue a bounded action workflow from apply to impacted tests", async () => {
+  const registry = new ModelProviderRegistry([], "copilot");
+  const calledTools: string[] = [];
+  const runtime = new AgentRuntime({
+    workspaceRoot: "C:/repo",
+    providerRegistry: registry,
+    toolExecutor: {
+      invokeTool: async (_root, name, argumentsPayload) => {
+        calledTools.push(name);
+        if (name === "apply_symbol_change_and_validate") {
+          assert.equal(argumentsPayload.symbol_name, "TokenSaviorService.invoke_tool");
+          return {
+            name,
+            ok: true,
+            content: [JSON.stringify({ checkpoint_id: "ckpt-1", validated: true })],
+          };
+        }
+
+        assert.equal(name, "run_impacted_tests");
+        assert.deepEqual(argumentsPayload.symbol_names, ["TokenSaviorService.invoke_tool"]);
+        return {
+          name,
+          ok: true,
+          content: ["2 impacted tests passed"],
+        };
+      },
+    },
+  });
+
+  const result = await runtime.runAction({
+    query: "Apply the selected text to TokenSaviorService.invoke_tool and validate it",
+    selectedText: "def invoke_tool(self, name: str) -> str:\n    return name",
+    activeFilePath: "src/token_savior/service_api/service.py",
+    maxToolSteps: 3,
+  });
+
+  assert.deepEqual(calledTools, ["apply_symbol_change_and_validate", "run_impacted_tests"]);
+  assert.deepEqual(result.plans?.filter((plan) => plan.kind === "tool").map((plan) => plan.toolName), [
+    "apply_symbol_change_and_validate",
+    "run_impacted_tests",
+  ]);
+  assert.equal(result.toolResults?.length, 2);
+  assert.match(result.answer, /2 impacted tests passed/i);
+});

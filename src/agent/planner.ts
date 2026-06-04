@@ -1,5 +1,5 @@
 import type { ModelProvider } from "../providers/base";
-import { formatToolResult, type ToolResult } from "../tools/interface";
+import { formatToolResult, type ToolResult, type ToolDefinition } from "../tools/interface";
 
 import type { AgentPlan, AgentRuntimeMode, AgentToolName } from "./types";
 
@@ -14,11 +14,15 @@ export interface AgentPlannerInput {
   toolManifest?: string;
   /** Set of currently registered tool names. undefined = accept any (compat mode). Empty set = no tools. */
   knownToolNames?: ReadonlySet<string>;
+  /** Task 2/5: full tool definitions for keyword-based heuristic selection. */
+  toolDefinitions?: ToolDefinition[];
 }
 
 export interface AgentPlannerFollowUpInput extends AgentPlannerInput {
   previousPlans: AgentPlan[];
   previousToolResults: ToolResult[];
+  /** Task 4: hint that the last tool result failed so the planner tries a corrective approach. */
+  previousResultFailed?: boolean;
 }
 
 type ModelPlanPayload = {
@@ -170,10 +174,15 @@ export function createHeuristicPlan(
   mode: AgentRuntimeMode = "preview",
   activeFilePath?: string,
   knownTools?: ReadonlySet<string>,
+  toolDefinitions?: ToolDefinition[],
 ): AgentPlan {
   const plan = computeHeuristicPlan(query, selectedText, mode, activeFilePath);
-  // Registry guard: if the chosen tool is not registered, fall back to a direct response.
+  // Registry guard: if the chosen tool is not registered, try keyword-based selection
+  // from the registered tool definitions before falling back to a direct response.
   if (plan.kind === "tool" && knownTools !== undefined && !knownTools.has(plan.toolName)) {
+    // Task 2: try keyword-based fallback using registered tool definitions.
+    const keywordPlan = computeKeywordPlan(query, selectedText, mode, toolDefinitions, knownTools);
+    if (keywordPlan) { return keywordPlan; }
     return {
       kind: "direct",
       response: knownTools.size === 0
@@ -184,6 +193,55 @@ export function createHeuristicPlan(
     };
   }
   return plan;
+}
+
+/**
+ * Task 2: tool-agnostic keyword-based heuristic.
+ * When the token-savior hardcoded tools are not registered, score all registered
+ * tool definitions by keyword overlap with the query and pick the best match.
+ */
+function computeKeywordPlan(
+  query: string,
+  selectedText: string | undefined,
+  mode: AgentRuntimeMode,
+  toolDefinitions: ToolDefinition[] | undefined,
+  knownTools: ReadonlySet<string>,
+): AgentPlan | undefined {
+  if (!toolDefinitions || toolDefinitions.length === 0) { return undefined; }
+  const lower = query.toLowerCase();
+  const words = lower.replace(/[^a-z0-9 ]/g, " ").split(/\s+/).filter((w) => w.length > 2);
+  if (words.length === 0) { return undefined; }
+
+  // Only consider tools that are registered AND appropriate for the current mode.
+  const candidates = toolDefinitions.filter((t) => {
+    if (!knownTools.has(t.name)) { return false; }
+    if (mode === "preview" && t.mutatesWorkspace) { return false; }
+    return true;
+  });
+  if (candidates.length === 0) { return undefined; }
+
+  let bestTool: ToolDefinition | undefined;
+  let bestScore = 0;
+  for (const t of candidates) {
+    const haystack = `${t.name} ${t.category} ${t.description}`.toLowerCase();
+    const score = words.reduce((acc, w) => acc + (haystack.includes(w) ? 1 : 0), 0);
+    if (score > bestScore) { bestScore = score; bestTool = t; }
+  }
+
+  // Require at least one keyword match to avoid random tool selection.
+  if (!bestTool || bestScore === 0) { return undefined; }
+
+  const args: Record<string, unknown> = { query: query.trim() };
+  const symbolName = extractLikelySymbolName(query, selectedText);
+  if (symbolName) { args["name"] = symbolName; }
+
+  return {
+    kind: "tool",
+    toolName: bestTool.name,
+    arguments: args,
+    reasoning: `Keyword match selected ${bestTool.name} (score: ${bestScore}) as the best available tool for this request.`,
+    source: "heuristic",
+  };
 }
 
 function computeHeuristicPlan(
@@ -421,7 +479,7 @@ export class AgentPlanner {
   public async plan(input: AgentPlannerInput): Promise<AgentPlan> {
     const mode = input.mode ?? "preview";
     const knownTools = input.knownToolNames;
-    const fallbackPlan = createHeuristicPlan(input.query, input.selectedText, mode, input.activeFilePath, knownTools);
+    const fallbackPlan = createHeuristicPlan(input.query, input.selectedText, mode, input.activeFilePath, knownTools, input.toolDefinitions);
     if (!input.provider) {
       return fallbackPlan;
     }
@@ -491,12 +549,18 @@ export class AgentPlanner {
       mode,
       input.activeFilePath,
       knownTools,
+      input.toolDefinitions,
     );
     if (!input.provider) {
       return heuristic;
     }
 
     const toolManifest = input.toolManifest ?? "(no tools available — always return a direct response)";
+
+    // Task 4: failure hint for the system prompt when the last tool result failed.
+    const failureHint = input.previousResultFailed
+      ? "IMPORTANT: The previous tool call returned a failure result. Choose a DIFFERENT tool or return a direct answer. Do NOT repeat the same tool."
+      : undefined;
 
     try {
       const response = await input.provider.complete({
@@ -511,6 +575,7 @@ export class AgentPlanner {
               "Available tools:",
               toolManifest,
               "",
+              ...(failureHint ? [failureHint, ""] : []),
               "Avoid repeating the same tool unless the previous result clearly failed.",
               "Return strict JSON only with no prose.",
               "Direct answer format:",
@@ -572,11 +637,14 @@ function createHeuristicFollowUpPlan(
   mode: AgentRuntimeMode = "preview",
   activeFilePath?: string,
   knownTools?: ReadonlySet<string>,
+  toolDefinitions?: ToolDefinition[],
 ): AgentPlan | undefined {
   const plan = computeHeuristicFollowUpPlan(query, previousPlans, previousToolResults, selectedText, mode, activeFilePath);
   // Registry guard: skip follow-up tool steps for tools that are not registered.
+  // Task 2: try keyword-based selection before giving up.
   if (plan && plan.kind === "tool" && knownTools !== undefined && !knownTools.has(plan.toolName)) {
-    return undefined;
+    const keywordPlan = computeKeywordPlan(query, selectedText, mode, toolDefinitions, knownTools);
+    return keywordPlan ?? undefined;
   }
   return plan;
 }
@@ -592,6 +660,8 @@ function computeHeuristicFollowUpPlan(
   const lower = query.trim().toLowerCase();
   const symbolName = extractLikelySymbolName(query, selectedText);
   const actionId = extractLikelyProjectActionId(query);
+  const requestedApply = lower.includes("apply") || lower.includes("replace") || lower.includes("rewrite") || lower.includes("update") || lower.includes("refactor");
+  const requestedValidation = lower.includes("validate") || lower.includes("test");
   const usedTools = new Set(previousPlans.filter((plan) => plan.kind === "tool").map((plan) => plan.toolName));
   const lastResult = previousToolResults.at(-1);
 
@@ -605,11 +675,7 @@ function computeHeuristicFollowUpPlan(
   }
 
   if (mode === "action") {
-    if (
-      usedTools.has("run_impacted_tests")
-      || usedTools.has("apply_symbol_change_and_validate")
-      || usedTools.has("run_project_action")
-    ) {
+    if (usedTools.has("run_impacted_tests")) {
       return undefined;
     }
 
@@ -631,7 +697,7 @@ function computeHeuristicFollowUpPlan(
       && symbolName
       && !usedTools.has("apply_symbol_change_and_validate")
       && usedTools.has("find_symbol")
-      && (lower.includes("apply") || lower.includes("replace") || lower.includes("rewrite") || lower.includes("update") || lower.includes("refactor"))
+      && requestedApply
     ) {
       return {
         kind: "tool",
@@ -647,6 +713,30 @@ function computeHeuristicFollowUpPlan(
         reasoning: "After locating the symbol, the next bounded action step is to apply the requested change with validation.",
         source: "heuristic",
       };
+    }
+
+    if (
+      !usedTools.has("run_impacted_tests")
+      && (
+        (usedTools.has("apply_symbol_change_and_validate") && requestedValidation)
+        || (usedTools.has("run_project_action") && requestedValidation)
+      )
+    ) {
+      return {
+        kind: "tool",
+        toolName: "run_impacted_tests",
+        arguments: {
+          ...(symbolName ? { symbol_names: [symbolName] } : activeFilePath ? { changed_files: [activeFilePath] } : {}),
+          include_output: true,
+          compact: false,
+        },
+        reasoning: "The approved action workflow should continue with targeted validation before stopping.",
+        source: "heuristic",
+      };
+    }
+
+    if (usedTools.has("apply_symbol_change_and_validate") || usedTools.has("run_project_action")) {
+      return undefined;
     }
   }
 

@@ -21,9 +21,18 @@ export interface TelemetrySnapshot {
   totalDurationMs: number;
   averageDurationMs: number;
   providerUsage: Record<string, number>;
+  automationProfile?: string;
+  workspaceRefreshes: number;
+  workspaceRefreshFailures: number;
+  staleRefreshes: number;
+  phaseChanges: number;
+  suggestionRefreshes: number;
+  suggestionChurnEvents: number;
   lastRunAt?: string;
   lastFailureMessage?: string;
   lastRecoveryMessage?: string;
+  lastRefreshReason?: string;
+  lastSuggestionChurnSummary?: string;
 }
 
 export interface TelemetryRunEvent {
@@ -35,6 +44,18 @@ export interface TelemetryRunEvent {
   toolCallCount: number;
   finishedAt?: string;
   errorMessage?: string;
+}
+
+export interface WorkspaceRefreshTelemetryEvent {
+  reason: string;
+  ok: boolean;
+  stale: boolean;
+  automationProfile: string;
+  previousPhase?: string;
+  nextPhase?: string;
+  previousSuggestions?: readonly string[];
+  nextSuggestions?: readonly string[];
+  suggestionNoiseThreshold?: number;
 }
 
 const DEFAULT_SNAPSHOT: TelemetrySnapshot = {
@@ -52,7 +73,24 @@ const DEFAULT_SNAPSHOT: TelemetrySnapshot = {
   totalDurationMs: 0,
   averageDurationMs: 0,
   providerUsage: {},
+  workspaceRefreshes: 0,
+  workspaceRefreshFailures: 0,
+  staleRefreshes: 0,
+  phaseChanges: 0,
+  suggestionRefreshes: 0,
+  suggestionChurnEvents: 0,
 };
+
+function summarizeSuggestionChurn(added: readonly string[], removed: readonly string[]): string | undefined {
+  if (added.length === 0 && removed.length === 0) {
+    return undefined;
+  }
+
+  return [
+    added.length > 0 ? `Added: ${added.join(", ")}` : undefined,
+    removed.length > 0 ? `Removed: ${removed.join(", ")}` : undefined,
+  ].filter(Boolean).join(" | ");
+}
 
 export class TelemetryState {
   public constructor(private readonly workspaceState: vscode.Memento) {}
@@ -107,10 +145,20 @@ export class TelemetryState {
     return updated;
   }
 
-  public async recordBackendRestart(): Promise<TelemetrySnapshot> {
+  public async recordAutomationProfile(profile: string): Promise<TelemetrySnapshot> {
     const updated = {
       ...this.getSnapshot(),
-      backendRestarts: this.getSnapshot().backendRestarts + 1,
+      automationProfile: profile,
+    };
+    await this.workspaceState.update(TELEMETRY_KEY, updated);
+    return updated;
+  }
+
+  public async recordBackendRestart(): Promise<TelemetrySnapshot> {
+    const current = this.getSnapshot();
+    const updated = {
+      ...current,
+      backendRestarts: current.backendRestarts + 1,
     };
     await this.workspaceState.update(TELEMETRY_KEY, updated);
     return updated;
@@ -123,6 +171,35 @@ export class TelemetryState {
       recoveryEvents: current.recoveryEvents + 1,
       lastRecoveryMessage: message,
     };
+    await this.workspaceState.update(TELEMETRY_KEY, updated);
+    return updated;
+  }
+
+  public async recordWorkspaceRefresh(event: WorkspaceRefreshTelemetryEvent): Promise<TelemetrySnapshot> {
+    const current = this.getSnapshot();
+    const previous = new Set((event.previousSuggestions ?? []).map((value) => value.trim()).filter((value) => value.length > 0));
+    const next = new Set((event.nextSuggestions ?? []).map((value) => value.trim()).filter((value) => value.length > 0));
+    const added = [...next].filter((value) => !previous.has(value));
+    const removed = [...previous].filter((value) => !next.has(value));
+    const churnCount = added.length + removed.length;
+    const churnDetected = churnCount >= Math.max(1, event.suggestionNoiseThreshold ?? 3);
+    const phaseChanged = Boolean(event.previousPhase && event.nextPhase && event.previousPhase !== event.nextPhase);
+
+    const updated: TelemetrySnapshot = {
+      ...current,
+      automationProfile: event.automationProfile,
+      workspaceRefreshes: current.workspaceRefreshes + 1,
+      workspaceRefreshFailures: current.workspaceRefreshFailures + (event.ok ? 0 : 1),
+      staleRefreshes: current.staleRefreshes + (event.stale ? 1 : 0),
+      phaseChanges: current.phaseChanges + (phaseChanged ? 1 : 0),
+      suggestionRefreshes: current.suggestionRefreshes + (event.ok ? 1 : 0),
+      suggestionChurnEvents: current.suggestionChurnEvents + (churnDetected ? 1 : 0),
+      lastRefreshReason: event.reason,
+      lastSuggestionChurnSummary: churnDetected
+        ? summarizeSuggestionChurn(added, removed) ?? current.lastSuggestionChurnSummary
+        : current.lastSuggestionChurnSummary,
+    };
+
     await this.workspaceState.update(TELEMETRY_KEY, updated);
     return updated;
   }

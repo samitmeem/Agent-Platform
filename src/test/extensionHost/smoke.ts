@@ -94,11 +94,11 @@ function createSeededRun(): StoredPreviewRun {
 }
 
 export async function runSmokeTests(): Promise<void> {
-  const extension = vscode.extensions.getExtension("mibayy.token-savior-agent");
-  assert.ok(extension, "Expected the Token Savior extension to be discoverable in the extension host.");
+  const extension = vscode.extensions.getExtension("samitmeem.agent-platform");
+  assert.ok(extension, "Expected the Agent-Platform extension to be discoverable in the extension host.");
 
   await extension.activate();
-  assert.ok(extension.isActive, "Expected the Token Savior extension to activate successfully.");
+  assert.ok(extension.isActive, "Expected the Agent-Platform extension to activate successfully.");
 
   const commands = await vscode.commands.getCommands(true);
   for (const command of REQUIRED_COMMANDS) {
@@ -108,6 +108,26 @@ export async function runSmokeTests(): Promise<void> {
   const config = vscode.workspace.getConfiguration("agentPlatform");
   assert.equal(config.get("persistRunHistory"), true);
   assert.equal(config.get("autoSaveProjectMemory"), false);
+  assert.equal(config.get("automationProfile"), "balanced");
+
+  const workspaceMemory = await vscode.commands.executeCommand<{ summary?: string } | undefined>(
+    "agentPlatform.test.getWorkspaceProjectMemory",
+  );
+  assert.match(workspaceMemory?.summary ?? "", /Purpose:|Stack:|Current goals:/i);
+  const workspaceSuggestions = await vscode.commands.executeCommand<Array<{ title?: string; reason?: string }> | undefined>(
+    "agentPlatform.test.getWorkspaceSuggestions",
+  );
+  assert.ok((workspaceSuggestions?.length ?? 0) > 0, "Expected automatic workspace suggestions to be available after activation.");
+  assert.equal(typeof workspaceSuggestions?.[0]?.title, "string");
+  const workspaceProjectMode = await vscode.commands.executeCommand<{
+    goal?: string;
+    milestones?: Array<{ title?: string }>;
+    lastApprovedWorkflow?: { toolSequence?: string[] };
+  } | undefined>(
+    "agentPlatform.test.getWorkspaceProjectMode",
+  );
+  assert.equal(typeof workspaceProjectMode?.goal, "string");
+  assert.ok((workspaceProjectMode?.milestones?.length ?? 0) > 0, "Expected project milestones to be available after activation.");
 
   await vscode.commands.executeCommand("agentPlatform.test.resetState");
 
@@ -232,6 +252,14 @@ export async function runSmokeTests(): Promise<void> {
         [JSON.stringify({ checkpoint_id: "ckpt-live-1", validated: true })],
       ),
     },
+    {
+      toolName: "run_impacted_tests",
+      response: createMockToolResult(
+        "run_impacted_tests",
+        workspaceRoot,
+        ["2 impacted tests passed"],
+      ),
+    },
   ]);
   await vscode.commands.executeCommand("agentPlatform.test.enqueueInputBoxResponses", [
     "Apply the selected text to TokenSaviorService.invoke_tool and validate",
@@ -253,6 +281,7 @@ export async function runSmokeTests(): Promise<void> {
   assert.ok(applyInvocation, "Expected the action command flow to invoke apply_symbol_change_and_validate through the backend gateway.");
   assert.equal(applyInvocation?.argumentsPayload.symbol_name, "TokenSaviorService.invoke_tool");
   assert.equal(applyInvocation?.argumentsPayload.file_path, "README.md");
+  assert.ok(actionToolInvocations?.some((call) => call.toolName === "run_impacted_tests"));
 
   const lastCheckpoint = await vscode.commands.executeCommand<LastCheckpointRecord | undefined>(
     "agentPlatform.test.getLastCheckpoint",
@@ -264,20 +293,31 @@ export async function runSmokeTests(): Promise<void> {
   assert.equal(telemetryAfterAction?.totalRuns, 2);
   assert.equal(telemetryAfterAction?.actionRuns, 1);
   assert.equal(telemetryAfterAction?.completedRuns, 2);
+  const projectModeAfterAction = await vscode.commands.executeCommand<{
+    lastApprovedWorkflow?: { toolSequence?: string[]; query?: string };
+    milestones?: Array<{ title?: string }>;
+  } | undefined>(
+    "agentPlatform.test.getWorkspaceProjectMode",
+  );
+  assert.ok(projectModeAfterAction?.lastApprovedWorkflow?.toolSequence?.includes("apply_symbol_change_and_validate"));
+  assert.match(projectModeAfterAction?.lastApprovedWorkflow?.query ?? "", /Apply the selected text/i);
+  assert.ok((projectModeAfterAction?.milestones?.length ?? 0) > 0, "Expected project mode milestones to remain populated after the action workflow.");
 
   await vscode.commands.executeCommand("workbench.action.closeAllEditors");
   await vscode.commands.executeCommand("agentPlatform.showObservabilityDashboard", actionRun?.id);
-  assert.ok(extension.isActive, "Expected the Token Savior extension to remain active after the dashboard command.");
+  assert.ok(extension.isActive, "Expected the Agent-Platform extension to remain active after the dashboard command.");
 
   const observabilityPanel = await vscode.commands.executeCommand<ObservabilityPanelSnapshot | undefined>(
     "agentPlatform.test.getLastObservabilityPanel",
   );
   assert.equal(observabilityPanel?.viewType, "agentPlatform.observability");
-  assert.equal(observabilityPanel?.title, "Token Savior Observability");
+  assert.equal(observabilityPanel?.title, "Agent-Platform Observability");
   assert.match(observabilityPanel?.html ?? "", /Action runs/);
   assert.match(observabilityPanel?.html ?? "", /Apply the selected text to TokenSaviorService\.invoke_tool and validate/);
   assert.match(observabilityPanel?.html ?? "", /ckpt-live-1/);
   assert.match(observabilityPanel?.html ?? "", /Latest checkpoint/);
+  assert.match(observabilityPanel?.html ?? "", /Automation profile/);
+  assert.match(observabilityPanel?.html ?? "", /balanced/);
 
   await vscode.commands.executeCommand("agentPlatform.test.clearToolResponses");
   await vscode.commands.executeCommand("agentPlatform.test.setToolResponses", [

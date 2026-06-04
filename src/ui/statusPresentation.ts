@@ -9,19 +9,19 @@ export type BackendIndicatorState = {
 export function getStatusBarText(state: BackendIndicatorState): string {
   switch (state.kind) {
     case "starting":
-      return "$(sync~spin) Token Savior";
+      return "$(sync~spin) Agent-Platform";
     case "ready":
-      return "$(check) Token Savior";
+      return "$(check) Agent-Platform";
     case "error":
-      return "$(error) Token Savior";
+      return "$(error) Agent-Platform";
     case "idle":
     default:
-      return "$(circle-slash) Token Savior";
+      return "$(circle-slash) Agent-Platform";
   }
 }
 
 export function getStatusBarTooltip(state: BackendIndicatorState): string {
-  const lines = ["Token Savior backend"];
+  const lines = ["Agent-Platform backend"];
 
   switch (state.kind) {
     case "starting":

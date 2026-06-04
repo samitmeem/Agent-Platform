@@ -11,6 +11,7 @@ import {
   getPrimaryWorkspaceRoot,
   isTokenSaviorConfigurationChange,
   loadApprovalSettings,
+  loadAutomationSettings,
   loadModelProviderSettings,
 } from "./config";
 import type { ApprovalSettings } from "./policies/approvalPolicy";
@@ -24,12 +25,20 @@ import { defaultCommandUi, ExtensionTestHarness } from "./testing/extensionTestH
 import { AgentRunHistoryTreeProvider } from "./views/runHistoryTree";
 import { registerChatParticipant } from "./chat/participant";
 import { registerCommands } from "./commands";
+import { registerCopilotTools } from "./copilotTools";
+import { WorkspaceRefreshCoordinator } from "./agent/refreshCoordinator";
+import {
+  shouldRefreshProjectMemoryForPath,
+} from "./agent/projectMemoryInitializer";
+import { DEFAULT_WORKSPACE_REFRESH_STATE } from "./state/workspaceAnalysis";
 import { BackendStatusBarController } from "./ui/statusBar";
 
 let tokenSaviorProvider: TokenSaviorToolProvider | undefined;
 let toolProviderRegistry: ToolProviderRegistry | undefined;
 let gateway: BackendGateway | undefined;
 let providerRegistry: ModelProviderRegistry | undefined;
+
+const WORKSPACE_BOOTSTRAP_TIMEOUT_MS = 4_000;
 
 async function recoverInterruptedRun(
   workspaceStore: WorkspaceStore,
@@ -69,6 +78,12 @@ function registerTestCommands(
         await workspaceStore.persistPreviewRuns([]);
         await workspaceStore.clearLastCheckpoint();
         await workspaceStore.clearActiveRun();
+        await workspaceStore.clearWorkspaceProfile();
+        await workspaceStore.clearWorkspacePhase();
+        await workspaceStore.clearWorkspaceProjectMode();
+        await workspaceStore.clearWorkspaceProjectMemory();
+        await workspaceStore.clearWorkspaceSuggestions();
+        await workspaceStore.saveWorkspaceRefreshState({ ...DEFAULT_WORKSPACE_REFRESH_STATE });
         await telemetryState.reset();
         testHarness?.reset();
         return true;
@@ -232,11 +247,12 @@ function registerTestCommands(
 }
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
-  const outputChannel = vscode.window.createOutputChannel("Token Savior");
+  const outputChannel = vscode.window.createOutputChannel("Agent-Platform");
   const statusBar = new BackendStatusBarController();
   const sessionStore = new SessionStore();
   const workspaceStore = new WorkspaceStore(context.workspaceState);
   const telemetryState = new TelemetryState(context.workspaceState);
+  const getAutomationSettings = () => loadAutomationSettings();
   workspaceStore.hydrateSessionStore(sessionStore);
   const runHistoryTreeProvider = new AgentRunHistoryTreeProvider(sessionStore);
 
@@ -260,6 +276,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     );
     toolProviderRegistry.registerProvider(tokenSaviorProvider);
     gateway = tokenSaviorProvider.getGateway();
+    gateway.setToolTimeoutMs(getAutomationSettings().toolTimeoutMs);
   }
 
   const testHarness = context.extensionMode === vscode.ExtensionMode.Test ? new ExtensionTestHarness() : undefined;
@@ -294,7 +311,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     );
   };
   providerRegistry = createProviderRegistry();
+  await telemetryState.recordAutomationProfile(getAutomationSettings().profile);
   registerTestCommands(context, sessionStore, workspaceStore, telemetryState, outputChannel, testHarness);
+  const refreshCoordinator = new WorkspaceRefreshCoordinator({
+    getWorkspaceRoot: getPrimaryWorkspaceRoot,
+    sessionStore,
+    workspaceStore,
+    outputChannel,
+    bootstrapTimeoutMs: WORKSPACE_BOOTSTRAP_TIMEOUT_MS,
+    resolveAutomationSettings: getAutomationSettings,
+    onRefreshTelemetry: async (event) => {
+      await telemetryState.recordWorkspaceRefresh(event);
+    },
+  });
 
   async function refreshStatus(reason = "refresh"): Promise<ServiceHealth | undefined> {
     const workspaceRoot = getPrimaryWorkspaceRoot();
@@ -323,7 +352,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     toolProviderRegistry: effectiveRegistry,
     policyRegistry,
     gateway,
-    memoryCapability: toolProviderRegistry.resolveMemoryCapability(),
+    resolveMemoryCapability: () => toolProviderRegistry!.resolveMemoryCapability(),
     statusBar,
     outputChannel,
     ui: testHarness ?? defaultCommandUi,
@@ -333,14 +362,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     getTelemetryState: () => telemetryState,
     getWorkspaceStore: () => workspaceStore,
     getApprovalSettings: loadApprovalSettings,
+    resolveAutomationSettings: getAutomationSettings,
     refreshStatus,
+    refreshProjectContext: (reason) => refreshCoordinator.refreshNow(reason ?? "command"),
     recordObservabilityPanel: (snapshot) => testHarness?.recordObservabilityPanel(snapshot),
   });
 
   const chatParticipant = registerChatParticipant(context, {
     toolProviderRegistry: effectiveRegistry,
     gateway,
-    memoryCapability: toolProviderRegistry.resolveMemoryCapability(),
+    resolveMemoryCapability: () => toolProviderRegistry!.resolveMemoryCapability(),
     statusBar,
     outputChannel,
     getWorkspaceRoot: getPrimaryWorkspaceRoot,
@@ -349,13 +380,24 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     getApprovalSettings: loadApprovalSettings,
     getWorkspaceStore: () => workspaceStore,
     getTelemetryState: () => telemetryState,
+    resolveAutomationSettings: getAutomationSettings,
   });
 
   await recoverInterruptedRun(workspaceStore, telemetryState, outputChannel);
 
+  // Expose read-only tools to Copilot's native agent mode so they are available
+  // without the @agent-platform prefix. Approval-gated tools are intentionally excluded.
+  registerCopilotTools(context, {
+    toolProviderRegistry: effectiveRegistry,
+    getWorkspaceRoot: getPrimaryWorkspaceRoot,
+    getSessionStore: () => sessionStore,
+    getWorkspaceStore: () => workspaceStore,
+  });
+
   context.subscriptions.push(
     outputChannel,
     statusBar,
+    refreshCoordinator,
     runHistoryTreeProvider,
     chatParticipant,
     {
@@ -371,23 +413,80 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     },
     vscode.window.registerTreeDataProvider("agentPlatform.runHistory", runHistoryTreeProvider),
     vscode.workspace.onDidChangeConfiguration((event) => {
-      if (!isTokenSaviorConfigurationChange(event)) {
+      if (!event.affectsConfiguration("agentPlatform")) {
         return;
       }
 
       void (async () => {
-        statusBar.setStarting("Applying updated Token Savior configuration…");
-        providerRegistry = createProviderRegistry();
-        await gateway?.restart();
-        await telemetryState.recordBackendRestart();
-        await refreshStatus("config changed");
+        const automationSettings = getAutomationSettings();
+        gateway?.setToolTimeoutMs(automationSettings.toolTimeoutMs);
+        await telemetryState.recordAutomationProfile(automationSettings.profile);
+
+        if (isTokenSaviorConfigurationChange(event)) {
+          statusBar.setStarting("Applying updated Agent-Platform configuration…");
+          providerRegistry = createProviderRegistry();
+          await gateway?.restart();
+          await telemetryState.recordBackendRestart();
+          await refreshStatus("config changed");
+        }
+
+        await refreshCoordinator.refreshNow("config changed");
       })();
     }),
+    vscode.workspace.onDidSaveTextDocument((document) => {
+      const workspaceRoot = getPrimaryWorkspaceRoot();
+      if (!workspaceRoot || document.uri.scheme !== "file" || !getAutomationSettings().enableFileWatchRefresh) {
+        return;
+      }
+      if (!shouldRefreshProjectMemoryForPath(workspaceRoot, document.uri.fsPath)) {
+        return;
+      }
+
+      refreshCoordinator.scheduleRefresh("document saved");
+    }),
+    vscode.workspace.onDidCreateFiles((event) => {
+      const workspaceRoot = getPrimaryWorkspaceRoot();
+      if (!workspaceRoot || !getAutomationSettings().enableFileWatchRefresh) {
+        return;
+      }
+      if (!event.files.some((uri) => uri.scheme === "file" && shouldRefreshProjectMemoryForPath(workspaceRoot, uri.fsPath))) {
+        return;
+      }
+
+      refreshCoordinator.scheduleRefresh("files created");
+    }),
+    vscode.workspace.onDidDeleteFiles((event) => {
+      const workspaceRoot = getPrimaryWorkspaceRoot();
+      if (!workspaceRoot || !getAutomationSettings().enableFileWatchRefresh) {
+        return;
+      }
+      if (!event.files.some((uri) => uri.scheme === "file" && shouldRefreshProjectMemoryForPath(workspaceRoot, uri.fsPath))) {
+        return;
+      }
+
+      refreshCoordinator.scheduleRefresh("files deleted");
+    }),
+    vscode.workspace.onDidRenameFiles((event) => {
+      const workspaceRoot = getPrimaryWorkspaceRoot();
+      if (!workspaceRoot || !getAutomationSettings().enableFileWatchRefresh) {
+        return;
+      }
+      if (!event.files.some((entry) => (
+        (entry.oldUri.scheme === "file" && shouldRefreshProjectMemoryForPath(workspaceRoot, entry.oldUri.fsPath))
+        || (entry.newUri.scheme === "file" && shouldRefreshProjectMemoryForPath(workspaceRoot, entry.newUri.fsPath))
+      ))) {
+        return;
+      }
+
+      refreshCoordinator.scheduleRefresh("files renamed");
+    }),
     vscode.workspace.onDidChangeWorkspaceFolders(() => {
+      void refreshCoordinator.refreshNow("workspace changed");
       void refreshStatus("workspace changed");
     }),
     {
       dispose: () => {
+        refreshCoordinator.dispose();
         void toolProviderRegistry?.disposeAll();
         toolProviderRegistry = undefined;
         tokenSaviorProvider = undefined;
@@ -397,6 +496,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     },
   );
 
+  await refreshCoordinator.refreshNow("activate");
   void refreshStatus("activate");
 }
 

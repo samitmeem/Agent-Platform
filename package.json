@@ -208,6 +208,210 @@
         ]
       }
     ],
+    "languageModelTools": [
+      {
+        "name": "agent-platform_find_symbol",
+        "toolReferenceName": "find_symbol",
+        "tags": ["workspace", "symbol", "code"],
+        "displayName": "Find Symbol",
+        "modelDescription": "Locate a symbol (function, class, or variable) by name in the current workspace. Returns the file path and line number where the symbol is defined.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "The symbol name to search for (e.g. a function, class, or variable name)"
+            },
+            "level": {
+              "type": "number",
+              "description": "Optional search depth hint. Defaults to 1."
+            },
+            "hints": {
+              "type": "boolean",
+              "description": "Whether to include location hints in the result. Defaults to true."
+            },
+            "compress": {
+              "type": "boolean",
+              "description": "Whether to request a more compact backend response. Defaults to false."
+            }
+          },
+          "required": ["name"]
+        }
+      },
+      {
+        "name": "agent-platform_get_change_impact",
+        "toolReferenceName": "get_change_impact",
+        "tags": ["workspace", "symbol", "impact", "refactoring"],
+        "displayName": "Get Change Impact",
+        "modelDescription": "Show what would break if a symbol were changed or renamed. Returns the list of directly and transitively affected files and callers in the workspace.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "The symbol name to analyse for change impact"
+            },
+            "max_direct": {
+              "type": "number",
+              "description": "Optional cap for direct impact matches. Defaults to 20."
+            },
+            "max_transitive": {
+              "type": "number",
+              "description": "Optional cap for transitive impact matches. Defaults to 50."
+            }
+          },
+          "required": ["name"]
+        }
+      },
+      {
+        "name": "agent-platform_get_dependencies",
+        "toolReferenceName": "get_dependencies",
+        "tags": ["workspace", "symbol", "dependencies"],
+        "displayName": "Get Dependencies",
+        "modelDescription": "Show what a symbol or module depends on. Returns the full dependency chain for the given symbol in the current workspace.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "The symbol name to trace dependencies for"
+            },
+            "max_results": {
+              "type": "number",
+              "description": "Optional cap for dependency matches. Defaults to 20."
+            },
+            "compress": {
+              "type": "boolean",
+              "description": "Whether to request a more compact backend response. Defaults to false."
+            }
+          },
+          "required": ["name"]
+        }
+      },
+      {
+        "name": "agent-platform_get_workspace_profile",
+        "toolReferenceName": "get_workspace_profile",
+        "tags": ["workspace", "state", "profile"],
+        "displayName": "Get Workspace Profile",
+        "modelDescription": "Return the extension-managed workspace profile, including detected repo type, languages, frameworks, test commands, risk areas, and refresh status. Read-only and backend-optional.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "agent-platform_detect_phase",
+        "toolReferenceName": "detect_phase",
+        "tags": ["workspace", "state", "phase"],
+        "displayName": "Detect Lifecycle Phase",
+        "modelDescription": "Return the current extension-managed lifecycle phase assessment for the workspace, including confidence and reasons. Read-only and backend-optional.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "agent-platform_get_next_actions",
+        "toolReferenceName": "get_next_actions",
+        "tags": ["workspace", "guidance", "planning"],
+        "displayName": "Get Next Actions",
+        "modelDescription": "Return a concise list of safe, read-only next-step suggestions derived from workspace profile, lifecycle phase, refresh state, and project memory.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "max_actions": {
+              "type": "number",
+              "description": "Optional cap for the number of recommended next actions to return."
+            }
+          }
+        }
+      },
+      {
+        "name": "agent-platform_get_recent_run_summary",
+        "toolReferenceName": "get_recent_run_summary",
+        "tags": ["workspace", "runs", "history"],
+        "displayName": "Get Recent Run Summary",
+        "modelDescription": "Summarize the most recent preview or action runs recorded by the extension in this workspace session. Read-only and backend-optional.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "max_runs": {
+              "type": "number",
+              "description": "Optional cap for the number of recent runs to summarize."
+            }
+          }
+        }
+      },
+      {
+        "name": "agent-platform_get_project_memory_summary",
+        "toolReferenceName": "get_project_memory_summary",
+        "tags": ["workspace", "memory", "state"],
+        "displayName": "Get Project Memory Summary",
+        "modelDescription": "Return the extension-owned project memory summary, including project purpose, stack, conventions, current goals, and source fingerprints. Read-only and backend-optional.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "agent-platform_get_context_bundle",
+        "toolReferenceName": "get_context_bundle",
+        "tags": ["workspace", "context", "state"],
+        "displayName": "Get Context Bundle",
+        "modelDescription": "Return a bounded read-only context bundle that combines workspace profile, lifecycle phase, project memory summary, recent run summaries, test commands, warnings, and next actions.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "max_actions": {
+              "type": "number",
+              "description": "Optional cap for how many next actions to include in the context bundle."
+            },
+            "max_runs": {
+              "type": "number",
+              "description": "Optional cap for how many recent runs to include in the context bundle."
+            }
+          }
+        }
+      },
+      {
+        "name": "agent-platform_list_test_commands",
+        "toolReferenceName": "list_test_commands",
+        "tags": ["workspace", "tests", "validation"],
+        "displayName": "List Test Commands",
+        "modelDescription": "List test and validation commands detected from workspace state and project memory. Read-only and backend-optional.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "agent-platform_discover_project_actions",
+        "toolReferenceName": "discover_project_actions",
+        "tags": ["workspace", "actions", "read-only"],
+        "displayName": "Discover Project Actions",
+        "modelDescription": "Discover likely project actions from workspace state and optionally enrich them with backend-discovered runnable actions. This tool is read-only and does not execute any action.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "include_backend_actions": {
+              "type": "boolean",
+              "description": "Whether to include backend-discovered runnable actions when a backend read provider is available. Defaults to true."
+            }
+          }
+        }
+      }
+    ],
     "views": {
       "explorer": [
         {
@@ -348,6 +552,64 @@
           "type": "boolean",
           "default": true,
           "description": "Persist recent preview runs in workspace state so they survive extension-host restarts."
+        },
+        "agentPlatform.automationProfile": {
+          "type": "string",
+          "enum": [
+            "conservative",
+            "balanced",
+            "aggressive-but-safe"
+          ],
+          "default": "balanced",
+          "description": "Controls how much read-only always-on automation runs in the background. Conservative keeps refreshes minimal, balanced is the default, and aggressive-but-safe refreshes more often without silently mutating the workspace."
+        },
+        "agentPlatform.refreshDebounceMs": {
+          "type": "number",
+          "default": 250,
+          "minimum": 50,
+          "description": "Debounce window, in milliseconds, for automatic workspace refreshes triggered by file activity."
+        },
+        "agentPlatform.profileScanEntryLimit": {
+          "type": "number",
+          "default": 160,
+          "minimum": 20,
+          "description": "Maximum number of prioritized top-level workspace entries scanned when deriving the workspace profile."
+        },
+        "agentPlatform.projectMemorySourceFileLimit": {
+          "type": "number",
+          "default": 16,
+          "minimum": 4,
+          "description": "Maximum number of canonical docs and config files scanned when refreshing the extension-owned project memory snapshot."
+        },
+        "agentPlatform.actionDiscoveryLimit": {
+          "type": "number",
+          "default": 8,
+          "minimum": 2,
+          "description": "Maximum number of likely project actions retained during automatic workspace profiling."
+        },
+        "agentPlatform.maxWorkspaceSuggestions": {
+          "type": "number",
+          "default": 6,
+          "minimum": 1,
+          "description": "Maximum number of always-on workspace suggestions retained for observability and Copilot context."
+        },
+        "agentPlatform.maxContextBundleChars": {
+          "type": "number",
+          "default": 6000,
+          "minimum": 2000,
+          "description": "Maximum character budget for the runtime context bundle injected into model prompts."
+        },
+        "agentPlatform.staleStateThresholdMinutes": {
+          "type": "number",
+          "default": 60,
+          "minimum": 5,
+          "description": "Age threshold, in minutes, after which the last successful workspace refresh is considered stale."
+        },
+        "agentPlatform.suggestionNoiseThreshold": {
+          "type": "number",
+          "default": 3,
+          "minimum": 1,
+          "description": "Minimum number of added or removed suggestions that counts as noisy churn for observability telemetry."
         },
         "agentPlatform.toolTimeoutMs": {
           "type": "number",

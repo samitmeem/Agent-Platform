@@ -66,6 +66,33 @@ test("TelemetryState records backend restarts and recovery events", async () => 
   assert.match(snapshot.lastRecoveryMessage ?? "", /interrupted action run/i);
 });
 
+test("TelemetryState records automation profile and noisy suggestion churn", async () => {
+  const state = new TelemetryState(new FakeMemento() as never);
+
+  await state.recordAutomationProfile("balanced");
+  await state.recordWorkspaceRefresh({
+    reason: "document saved",
+    ok: true,
+    stale: false,
+    automationProfile: "balanced",
+    previousPhase: "implementation",
+    nextPhase: "testing",
+    previousSuggestions: ["Run npm test"],
+    nextSuggestions: ["Fix recent validation failures", "Run npm test"],
+    suggestionNoiseThreshold: 1,
+  });
+
+  const snapshot = state.getSnapshot();
+  assert.equal(snapshot.automationProfile, "balanced");
+  assert.equal(snapshot.workspaceRefreshes, 1);
+  assert.equal(snapshot.workspaceRefreshFailures, 0);
+  assert.equal(snapshot.phaseChanges, 1);
+  assert.equal(snapshot.suggestionRefreshes, 1);
+  assert.equal(snapshot.suggestionChurnEvents, 1);
+  assert.equal(snapshot.lastRefreshReason, "document saved");
+  assert.match(snapshot.lastSuggestionChurnSummary ?? "", /Added: Fix recent validation failures/i);
+});
+
 test("TelemetryState derives failure notes from failed recorded runs", async () => {
   const state = new TelemetryState(new FakeMemento() as never);
 

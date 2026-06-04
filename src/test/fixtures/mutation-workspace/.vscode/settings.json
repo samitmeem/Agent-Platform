@@ -1,8 +1,8 @@
 {
-  "tokenSaviorAgent.editApprovalMode": "ask",
-  "tokenSaviorAgent.testApprovalMode": "allow-trusted",
-  "tokenSaviorAgent.commandApprovalMode": "allow-trusted",
-  "tokenSaviorAgent.destructiveApprovalMode": "ask",
-  "tokenSaviorAgent.autoSaveProjectMemory": false,
-  "tokenSaviorAgent.persistRunHistory": true
+  "agentPlatform.editApprovalMode": "ask",
+  "agentPlatform.testApprovalMode": "allow-trusted",
+  "agentPlatform.commandApprovalMode": "allow-trusted",
+  "agentPlatform.destructiveApprovalMode": "ask",
+  "agentPlatform.autoSaveProjectMemory": false,
+  "agentPlatform.persistRunHistory": true
 }

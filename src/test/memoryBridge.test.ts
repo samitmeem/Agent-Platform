@@ -28,6 +28,7 @@ test("AgentMemoryBridge builds bounded recent-run and memory context", async () 
     workspaceRoot: "C:/repo",
     sessionStore: store,
     memoryCapability: { searchToolName: "memory_search", sessionHistoryToolName: "memory_session_history", saveToolName: "memory_save" },
+    workspaceMemorySummary: "Workspace summary from the extension.",
     toolExecutor: {
       invokeTool: async (_root, name) => {
         if (name === "memory_session_history") {
@@ -52,6 +53,7 @@ test("AgentMemoryBridge builds bounded recent-run and memory context", async () 
   assert.equal(context.recentRuns.length, 1);
   assert.match(context.recentRuns[0] ?? "", /Find symbol TokenSaviorService/);
   assert.equal(context.sessionHistory, "Session rollup");
+  assert.equal(context.workspaceMemory, "Workspace summary from the extension.");
   assert.equal(context.projectMemory, "Memory hit");
 });
 

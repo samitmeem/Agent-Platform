@@ -9,6 +9,7 @@ import {
   deriveToolResultFailureMessage,
   type AgentPreviewResult,
 } from "../agent/runtime";
+import { createApprovedWorkflowRecord, upsertApprovedWorkflow } from "../agent/projectMode";
 import { ToolApprovalDeniedError, ToolRouter } from "../agent/toolRouter";
 import { formatTraceEntries } from "../agent/trace";
 import { BackendGateway } from "../adapters/tokenSavior/gateway";
@@ -24,6 +25,7 @@ import { buildMemoryPayloadFromRun, buildMemoryPayloadFromToolResult } from "../
 import { globalToolPolicyRegistry } from "../policies/toolPolicy";
 import type { MemoryCapability } from "../tools/interface";
 import type { ApprovalSettings } from "../policies/approvalPolicy";
+import type { AutomationSettings } from "../config";
 import { ModelProviderRegistry } from "../providers/registry";
 import {
   formatStoredPreviewRunBody,
@@ -42,8 +44,8 @@ export interface CommandEnvironment {
   policyRegistry: ToolPolicyRegistry;
   /** Optional direct gateway reference — used only for health/restart of the token-savior adapter. */
   gateway?: BackendGateway;
-  /** Memory capability resolved from the active tool provider — passed to AgentRuntime. */
-  memoryCapability?: MemoryCapability;
+  /** Live resolver for the memory capability — called at run time, not activation time. */
+  resolveMemoryCapability?: () => MemoryCapability | undefined;
   statusBar: BackendStatusBarController;
   outputChannel: vscode.OutputChannel;
   ui: CommandUi;
@@ -53,7 +55,9 @@ export interface CommandEnvironment {
   getTelemetryState(): TelemetryState;
   getWorkspaceStore(): WorkspaceStore;
   getApprovalSettings(): ApprovalSettings;
+  resolveAutomationSettings?(): AutomationSettings;
   refreshStatus(reason?: string): Promise<ServiceHealth | undefined>;
+  refreshProjectContext?(reason?: string): Promise<void> | void;
   recordObservabilityPanel?(snapshot: ObservabilityPanelSnapshot): void;
 }
 
@@ -129,6 +133,42 @@ function summarizeBody(body: string, maxLength = 120): string {
   }
 
   return `${singleLine.slice(0, maxLength - 1)}…`;
+}
+
+async function syncWorkspaceContinuationState(
+  env: CommandEnvironment,
+  input: {
+    title: string;
+    toolName: string;
+    body: string;
+    ok: boolean;
+    activeFilePath?: string;
+  },
+): Promise<void> {
+  const policy = env.policyRegistry.resolve(input.toolName);
+  if (policy.safetyClass === "read" || policy.safetyClass === "memory") {
+    return;
+  }
+
+  const timestamp = new Date().toISOString();
+  try {
+    const workflow = createApprovedWorkflowRecord({
+      query: input.title,
+      toolSequence: [input.toolName],
+      summary: summarizeBody(input.body, 220),
+      outcome: input.ok ? "completed" : "failed",
+      startedAt: timestamp,
+      completedAt: timestamp,
+      activeFilePath: input.activeFilePath,
+    });
+    await env.getWorkspaceStore().saveWorkspaceProjectMode(
+      upsertApprovedWorkflow(env.getWorkspaceStore().getWorkspaceProjectMode(), workflow, timestamp),
+    );
+    await env.refreshProjectContext?.(`${input.toolName} completed`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    env.outputChannel.appendLine(`[project-mode] Failed to sync continuation state after ${input.toolName}: ${message}`);
+  }
 }
 
 function showStoredPreviewRun(
@@ -300,12 +340,13 @@ async function runToolCommand(
   title: string,
   toolName: string,
   argumentsPayload: Record<string, unknown> = {},
+  options?: { activeFilePath?: string },
 ): Promise<ToolResult | undefined> {
   const workspaceRoot = env.getWorkspaceRoot();
   if (!workspaceRoot) {
     env.statusBar.setIdle("Open a workspace folder to run backend commands.");
     void env.ui.showWarningMessage(
-      "Open a workspace folder before running Token Savior commands.",
+      "Open a workspace folder before running Agent-Platform commands.",
     );
     return undefined;
   }
@@ -322,6 +363,13 @@ async function runToolCommand(
     });
     const body = formatGenericToolResult(result);
     appendToolRun(env.outputChannel, title, body);
+    await syncWorkspaceContinuationState(env, {
+      title,
+      toolName,
+      body,
+      ok: !deriveToolResultFailureMessage(result),
+      activeFilePath: options?.activeFilePath,
+    });
 
     const failureMessage = deriveToolResultFailureMessage(result);
     if (failureMessage) {
@@ -396,7 +444,7 @@ async function completeTrackedRun(
 }
 
 function getRecordedRunFailureMessage(result: AgentPreviewResult): string {
-  return deriveRunFailureMessage(result) ?? "Token Savior received a failed backend tool result.";
+  return deriveRunFailureMessage(result) ?? "Agent-Platform received a failed backend tool result.";
 }
 
 async function failTrackedRun(
@@ -432,7 +480,7 @@ export function registerCommands(
       if (!workspaceRoot) {
         env.statusBar.setIdle("Open a workspace folder to connect.");
         void env.ui.showWarningMessage(
-          "Open a workspace folder before starting the Token Savior backend.",
+          "Open a workspace folder before starting the Agent-Platform backend.",
         );
         return;
       }
@@ -444,12 +492,12 @@ export function registerCommands(
         }
 
         void env.ui.showInformationMessage(
-          `Token Savior backend reachable: v${health.version} · profile=${health.profile} · capabilities=${health.capability_count} · projects=${health.project_count}`,
+          `Agent-Platform backend reachable: v${health.version} · profile=${health.profile} · capabilities=${health.capability_count} · projects=${health.project_count}`,
         );
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         env.statusBar.setError(message);
-        void env.ui.showErrorMessage(`Token Savior backend ping failed: ${message}`);
+        void env.ui.showErrorMessage(`Agent-Platform backend ping failed: ${message}`);
       }
     },
   );
@@ -461,7 +509,7 @@ export function registerCommands(
       if (!workspaceRoot) {
         env.statusBar.setIdle("Open a workspace folder to restart the backend.");
         void env.ui.showWarningMessage(
-          "Open a workspace folder before restarting the Token Savior backend.",
+          "Open a workspace folder before restarting the Agent-Platform backend.",
         );
         return;
       }
@@ -477,12 +525,12 @@ export function registerCommands(
         await env.getTelemetryState().recordBackendRestart();
         env.statusBar.setReady(health, "Backend restarted.");
         void env.ui.showInformationMessage(
-          `Token Savior backend restarted: v${health.version} · profile=${health.profile}`,
+          `Agent-Platform backend restarted: v${health.version} · profile=${health.profile}`,
         );
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         env.statusBar.setError(message);
-        void env.ui.showErrorMessage(`Token Savior backend restart failed: ${message}`);
+        void env.ui.showErrorMessage(`Agent-Platform backend restart failed: ${message}`);
       }
     },
   );
@@ -501,7 +549,7 @@ export function registerCommands(
       if (!workspaceRoot) {
         env.statusBar.setIdle("Open a workspace folder to analyze symbols.");
         void env.ui.showWarningMessage(
-          "Open a workspace folder before running Token Savior commands.",
+          "Open a workspace folder before running Agent-Platform commands.",
         );
         return;
       }
@@ -534,7 +582,7 @@ export function registerCommands(
       if (!workspaceRoot) {
         env.statusBar.setIdle("Open a workspace folder to find symbols.");
         void env.ui.showWarningMessage(
-          "Open a workspace folder before running Token Savior commands.",
+          "Open a workspace folder before running Agent-Platform commands.",
         );
         return;
       }
@@ -658,7 +706,9 @@ export function registerCommands(
         payload.changed_files = [activeFilePath];
       }
 
-      await runToolCommand(env, "Run Impacted Tests", "run_impacted_tests", payload);
+      await runToolCommand(env, "Run Impacted Tests", "run_impacted_tests", payload, {
+        activeFilePath,
+      });
     },
   );
 
@@ -694,6 +744,8 @@ export function registerCommands(
         rollback_on_failure: true,
         include_output: true,
         compact: false,
+      }, {
+        activeFilePath: filePath,
       });
       if (!result) {
         return;
@@ -821,14 +873,14 @@ export function registerCommands(
       if (!workspaceRoot) {
         env.statusBar.setIdle("Open a workspace folder to use the preview agent.");
         void env.ui.showWarningMessage(
-          "Open a workspace folder before running the Token Savior preview agent.",
+          "Open a workspace folder before running the Agent-Platform preview agent.",
         );
         return;
       }
 
       const selectedText = getSeedInputFromEditor();
       const query = await env.ui.showInputBox({
-        prompt: "Ask the Token Savior preview agent",
+        prompt: "Ask the Agent-Platform preview agent",
         placeHolder: "Example: What is this project about? or Find symbol TokenSaviorService.invoke_tool",
         value: selectedText,
         ignoreFocusOut: true,
@@ -855,7 +907,15 @@ export function registerCommands(
           providerRegistry: env.getProviderRegistry(),
           sessionStore: env.getSessionStore(),
           listTools: () => env.toolProviderRegistry.listAllTools(),
-          memoryCapability: env.memoryCapability,
+          resolveMemoryCapability: env.resolveMemoryCapability,
+          resolveAutomationSettings: env.resolveAutomationSettings,
+          resolveWorkspaceProfile: () => env.getWorkspaceStore().getWorkspaceProfile(),
+          resolveWorkspacePhase: () => env.getWorkspaceStore().getWorkspacePhase(),
+          resolveWorkspaceRefreshState: () => env.getWorkspaceStore().getWorkspaceRefreshState(),
+          resolveWorkspaceProjectMode: () => env.getWorkspaceStore().getWorkspaceProjectMode(),
+          resolveWorkspaceProjectMemory: () => env.getWorkspaceStore().getWorkspaceProjectMemory(),
+          resolveWorkspaceSuggestions: () => env.getWorkspaceStore().getWorkspaceSuggestions(),
+          resolveWorkspaceProjectMemorySummary: () => env.getWorkspaceStore().getWorkspaceProjectMemory()?.summary,
           toolExecutor: {
             invokeTool: (root, name, argumentsPayload) => env.toolProviderRegistry.routeTool(name, argumentsPayload, root),
           },
@@ -885,7 +945,7 @@ export function registerCommands(
         if (outcome === "failed") {
           const failureMessage = getRecordedRunFailureMessage(recorded.run.result);
           env.statusBar.setError(failureMessage);
-          void env.ui.showErrorMessage(`Token Savior preview agent failed: ${failureMessage}`);
+          void env.ui.showErrorMessage(`Agent-Platform preview agent failed: ${failureMessage}`);
           return;
         }
 
@@ -908,7 +968,7 @@ export function registerCommands(
           message,
         });
         env.statusBar.setError(message);
-        void env.ui.showErrorMessage(`Token Savior preview agent failed: ${message}`);
+        void env.ui.showErrorMessage(`Agent-Platform preview agent failed: ${message}`);
       }
     },
   );
@@ -920,7 +980,7 @@ export function registerCommands(
       if (!workspaceRoot) {
         env.statusBar.setIdle("Open a workspace folder to use the action agent.");
         void env.ui.showWarningMessage(
-          "Open a workspace folder before running the Token Savior action agent.",
+          "Open a workspace folder before running the Agent-Platform action agent.",
         );
         return;
       }
@@ -928,7 +988,7 @@ export function registerCommands(
       const selectedText = getSeedInputFromEditor();
       const activeFilePath = toWorkspaceRelativePath(workspaceRoot, getActiveEditorFilePath());
       const query = await env.ui.showInputBox({
-        prompt: "Ask the Token Savior action agent",
+        prompt: "Ask the Agent-Platform action agent",
         placeHolder: "Example: Apply the selected text to TokenSaviorService.invoke_tool and validate, or Run impacted tests for TokenSaviorService",
         ignoreFocusOut: true,
       });
@@ -954,7 +1014,15 @@ export function registerCommands(
           providerRegistry: env.getProviderRegistry(),
           sessionStore: env.getSessionStore(),
           listTools: () => env.toolProviderRegistry.listAllTools(),
-          memoryCapability: env.memoryCapability,
+          resolveMemoryCapability: env.resolveMemoryCapability,
+          resolveAutomationSettings: env.resolveAutomationSettings,
+          resolveWorkspaceProfile: () => env.getWorkspaceStore().getWorkspaceProfile(),
+          resolveWorkspacePhase: () => env.getWorkspaceStore().getWorkspacePhase(),
+          resolveWorkspaceRefreshState: () => env.getWorkspaceStore().getWorkspaceRefreshState(),
+          resolveWorkspaceProjectMode: () => env.getWorkspaceStore().getWorkspaceProjectMode(),
+          resolveWorkspaceProjectMemory: () => env.getWorkspaceStore().getWorkspaceProjectMemory(),
+          resolveWorkspaceSuggestions: () => env.getWorkspaceStore().getWorkspaceSuggestions(),
+          resolveWorkspaceProjectMemorySummary: () => env.getWorkspaceStore().getWorkspaceProjectMemory()?.summary,
           toolExecutor: createActionRuntimeToolExecutor(env, workspaceRoot, query.trim()),
         });
         const result = await runtime.runAction({
@@ -981,6 +1049,7 @@ export function registerCommands(
             await persistCheckpointFromResult(env, toolResult, activeFilePath);
           }
         }
+        await env.refreshProjectContext?.("action run completed");
         if (recorded.memoryStatus.state === "failed") {
           appendToolRun(env.outputChannel, "Agent Action Memory", recorded.memoryStatus.reason);
         }
@@ -988,7 +1057,7 @@ export function registerCommands(
         if (outcome === "failed") {
           const failureMessage = getRecordedRunFailureMessage(recorded.run.result);
           env.statusBar.setError(failureMessage);
-          void env.ui.showErrorMessage(`Token Savior action agent failed: ${failureMessage}`);
+          void env.ui.showErrorMessage(`Agent-Platform action agent failed: ${failureMessage}`);
           return;
         }
 
@@ -1010,7 +1079,7 @@ export function registerCommands(
             outcome: "cancelled",
           });
           env.statusBar.setIdle("Action agent cancelled.");
-          void env.ui.showInformationMessage("Token Savior action agent was cancelled before execution.");
+          void env.ui.showInformationMessage("Agent-Platform action agent was cancelled before execution.");
           return;
         }
 
@@ -1023,7 +1092,7 @@ export function registerCommands(
           message,
         });
         env.statusBar.setError(message);
-        void env.ui.showErrorMessage(`Token Savior action agent failed: ${message}`);
+        void env.ui.showErrorMessage(`Agent-Platform action agent failed: ${message}`);
       }
     },
   );
@@ -1037,6 +1106,13 @@ export function registerCommands(
         env.getTelemetryState().getSnapshot(),
         runId,
         env.getWorkspaceStore().getLastCheckpoint(),
+        env.getWorkspaceStore().getWorkspaceProfile(),
+        env.getWorkspaceStore().getWorkspacePhase(),
+        env.getWorkspaceStore().getWorkspaceRefreshState(),
+        env.getWorkspaceStore().getWorkspaceProjectMode(),
+        env.getWorkspaceStore().getWorkspaceProjectMemory(),
+        env.resolveAutomationSettings?.(),
+        env.getWorkspaceStore().getWorkspaceSuggestions(),
         env.recordObservabilityPanel,
       );
     },
@@ -1176,7 +1252,38 @@ export function registerCommands(
           env.getTelemetryState().getSnapshot(),
           runId,
           env.getWorkspaceStore().getLastCheckpoint(),
+          env.getWorkspaceStore().getWorkspaceProfile(),
+          env.getWorkspaceStore().getWorkspacePhase(),
+          env.getWorkspaceStore().getWorkspaceRefreshState(),
+          env.getWorkspaceStore().getWorkspaceProjectMode(),
+          env.getWorkspaceStore().getWorkspaceProjectMemory(),
+          env.resolveAutomationSettings?.(),
+          env.getWorkspaceStore().getWorkspaceSuggestions(),
         ),
+      ),
+      vscode.commands.registerCommand(
+        "agentPlatform.test.getWorkspaceProfile",
+        () => env.getWorkspaceStore().getWorkspaceProfile(),
+      ),
+      vscode.commands.registerCommand(
+        "agentPlatform.test.getWorkspacePhase",
+        () => env.getWorkspaceStore().getWorkspacePhase(),
+      ),
+      vscode.commands.registerCommand(
+        "agentPlatform.test.getWorkspaceRefreshState",
+        () => env.getWorkspaceStore().getWorkspaceRefreshState(),
+      ),
+      vscode.commands.registerCommand(
+        "agentPlatform.test.getWorkspaceProjectMemory",
+        () => env.getWorkspaceStore().getWorkspaceProjectMemory(),
+      ),
+      vscode.commands.registerCommand(
+        "agentPlatform.test.getWorkspaceProjectMode",
+        () => env.getWorkspaceStore().getWorkspaceProjectMode(),
+      ),
+      vscode.commands.registerCommand(
+        "agentPlatform.test.getWorkspaceSuggestions",
+        () => env.getWorkspaceStore().getWorkspaceSuggestions(),
       ),
     );
   }
