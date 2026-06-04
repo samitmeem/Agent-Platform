@@ -2,7 +2,7 @@
   "name": "agent-platform",
   "displayName": "Agent-Platform",
   "description": "A dynamic agent platform for VS Code — generic tool providers, adaptive planning, memory abstraction, and safe mutation workflows.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "samitmeem",
   "preview": true,
   "icon": "media/icon.png",

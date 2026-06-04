@@ -1,6 +1,6 @@
 # Agent-Platform Usage Guide
 
-**Version:** 0.1.0 (Beta)  
+**Version:** 0.2.0 (Beta)  
 **Status:** Early access — suitable for real development workflows with awareness of current limitations
 
 ---
@@ -568,7 +568,7 @@ Project memory stores text summaries, not live code references. A memory entry s
 
 ### Beta status
 
-This extension is at version 0.1.0 and marked as a preview release. APIs, configuration keys, tool behavior, and output formats may change between releases. Do not build critical automation on top of the current interface without accounting for breaking changes.
+This extension is at version 0.2.0 and marked as a preview release. APIs, configuration keys, tool behavior, and output formats may change between releases. Do not build critical automation on top of the current interface without accounting for breaking changes.
 
 ---
 
@@ -687,4 +687,4 @@ If a task's **Scope** field lists more than 3 files, stop and rewrite it as mult
 
 ---
 
-*Agent-Platform v0.1.0 (Beta) — MIT License — github.com/samitmeem/Agent-Platform*
+*Agent-Platform v0.2.0 (Beta) — MIT License — github.com/samitmeem/Agent-Platform*
